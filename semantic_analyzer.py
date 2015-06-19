@@ -100,7 +100,58 @@ class Analyzer(object):
 
 
     def analyze_func_definition(self, funcdef_node, level):
-        pass
+        if level != 0:
+            sys.stderr.write("Function definition is available only at top-level.")
+        else:
+            print("Begin analyzing function definition.")
+            # 抽象構文木をたどって関数名を取ってくる
+            name = funcdef_node.function_declarator.identifier.identifier
+            print("function definition name:{0}".format(name))
+
+            kind = "fun"
+            return_type = funcdef_node.type_specifier.type_specifier
+
+            objtype = ["fun", return_type]
+            if not isinstance(funcdef_node.function_declarator.parameter_type_list, ast.NullNode):
+                for param in funcdef_node.function_declarator.parameter_type_list.nodes:
+                    if param.parameter_declarator.kind == "NORMAL":
+                        objtype.append(param.type_specifier.type_specifier)
+                    elif param.parameter_declarator.kind == "POINTER":
+                        objtype.append(("pointer", param.type_specifier.type_specifier))
+
+        decl_funcdef = Decl(name, level, kind, tuple(objtype))
+
+        # for debug
+        print("new Decl class object of function definition: {0}".format(decl_funcdef))
+        print("name: {0}".format(decl_funcdef.name))
+        print("level: {0}".format(decl_funcdef.level))
+        print("kind: {0}".format(decl_funcdef.kind))
+        print("type: {0}".format(decl_funcdef.objtype))
+
+        return decl_funcdef
+
+
+    def analyze_param_declaration(self, paramdec_node, level):
+        print("Begin analyzing parameter declaration.")
+        # 抽象構文木をたどって変パラメータ宣言を取ってくる
+        name = paramdec_node.parameter_declarator.identifier.identifier
+        print("{0}".format(name))
+        if paramdec_node.parameter_declarator.kind == "NORMAL":
+            objtype = "int"
+        elif paramdec_node.parameter_declarator.kind == "POINTER":
+            objtype = ("pointer", "int")
+
+        decl_param = Decl(name, level, "param", objtype)
+
+        # for debug
+        print("new Decl class object of parameter declaration: {0}".format(decl_param))
+        print("name: {0}".format(decl_param.name))
+        print("level: {0}".format(decl_param.level))
+        print("kind: {0}".format(decl_param.kind))
+        print("type: {0}".format(decl_param.objtype))
+
+        return decl_param
+
 
 
     def analyze(self, nodelist, level=0):
@@ -119,15 +170,16 @@ class Analyzer(object):
                     existing_decl = self.env.lookup(decl_decl.name)
                     if existing_decl.kind == "fun" or existing_decl.kind == "proto":
                         if existing_decl.level == 0:
-                            sys.stderr.write("Error: {0} is defined as a function.".format(decl_decl.name))
+                            sys.stderr.write("Error: {0} is defined as a function.\n".format(decl_decl.name))
                         else:
                             self.env.add(decl_decl)
                     elif existing_decl.kind == "var":
                         if existing_decl.level == decl_decl.level:
-                            sys.stderr.write("Error: Duplicate declaration - {0}".format(decl_decl.name))
+                            sys.stderr.write("Error: Duplicate declaration - {0}\n".format(decl_decl.name))
                     elif existing_decl.kind == "param":
                         self.env.add(decl_decl)
                         print("Warning: This variable declaration is duplicated - param {0}".format(existing_decl.name))
+                print("")
 
         elif isinstance(nodelist, ast.FunctionPrototype):
             decl_proto = self.analyze_func_prototype(nodelist, level)
@@ -137,19 +189,67 @@ class Analyzer(object):
             else:
                 existing_decl = self.env.lookup(decl_proto.name)
                 if existing_decl.kind == "fun":
-                    if existing_decl.type != decl_proto.type:
-                        sys.stderr.write("Error: Conflicting {0} prototype definition with {1} function.".format(decl_proto.type, existing_decl.type))
+                    if existing_decl.objtype != decl_proto.objtype:
+                        sys.stderr.write("Error: Conflicting {0} prototype definition with {1} function.\n".format(decl_proto.type, existing_decl.type))
                     else:
+                        print("OK: Prototype declaration after function definition, type consisntent")
                         self.env.add(decl_proto)
                 elif existing_decl.kind == "proto":
-                    if existing_decl.proto == decl_proto.type:
-                        sys.stderr.write("Error: Type inconsintency of duplicate prototype definition - {0}".format(decl_proto.name))
+                    if existing_decl.objtype != decl_proto.objtype:
+                        sys.stderr.write("Error: Type inconsintency of duplicate prototype definition - {0}\n".format(decl_proto.name))
                     else:
+                        print("OK: Duplicate prototype declaration, but type consistent")
                         self.env.add(decl_proto)
                 elif existing_decl.kind == "var":
                     if existing_decl.level == 0:
-                        sys.stderr.write("Error: Duplicate prototype declaration with global variable: {0}".format(decl_proto.name))
+                        sys.stderr.write("Error: Duplicate prototype declaration with global variable: {0}\n".format(decl_proto.name))
                     else:
+                        print("OK: Duplicate prototype declaration and variable declaration, but they are at different level.")
                         self.env.add(decl_proto)
+            print("")
+            self.analyze(nodelist.function_declarator.parameter_type_list, level+1)
+
+        elif isinstance(nodelist, ast.FunctionDefinition):
+            decl_funcdef = self.analyze_func_definition(nodelist, level)
+            if self.env.lookup(decl_funcdef.name) == None:
+                    print("OK: No duplication in environment.")
+                    self.env.add(decl_funcdef)
+            else:
+                existing_decl = self.env.lookup(decl_funcdef.name)
+                if existing_decl.kind == "fun":
+                    sys.stderr.write("Error: Duplicate function definition - {0}.\n".format(decl_funcdef.name))
+                elif existing_decl.kind == "proto":
+                    if existing_decl.objtype != decl_funcdef.objtype:
+                        sys.stderr.write("Error: Type inconsintency of function prototype and function definition - {0}\n".format(decl_funcdef.name))
+                    else:
+                        print("OK: Types of prototype and function definition are consistent")
+                        self.env.add(decl_funcdef)
+                elif existing_decl.kind == "var":
+                    if existing_decl.level == 0:
+                        sys.stderr.write("Error: Duplicate function definition with global variable - {0}\n".format(decl_funcdef.name))
+                    else:
+                        print("OK: Duplicate function definition and variable declaration, but they are at different level.")
+                        self.env.add(decl_funcdef)
+            print("")
+            self.analyze(nodelist.function_declarator.parameter_type_list, level+1)
+
+        elif isinstance(nodelist, ast.ParameterTypeList):
+            for paramdec in nodelist.nodes:
+                decl_param = self.analyze_param_declaration(paramdec, level)
+                if self.env.lookup(decl_param.name) == None:
+                    print("OK: No duplication in environment.")
+                    self.env.add(decl_param)
+                else:
+                    existing_decl = self.env.lookup(decl_param.name)
+                    if existing_decl.kind == "param":
+                        if existing_decl.level != 1:
+                            sys.stderr.write("Unexpected parameter duplication - {0}.\n".format(decl_param.name))
+                        else:
+                            sys.stderr.write("Error: This parameter declaration is duplicated - param {0}\n".format(decl_param.name))
+                    else:
+                        self.env.add(decl_param)
+                print("")
+
+
 
         return self.env
