@@ -93,6 +93,17 @@ int main (int a) {
 }
 """
 
+testcode6 = """
+int i;
+int j;
+
+
+int main() {
+    int i;
+    return i;
+}
+"""
+
 # result1 = """
 # int main() {
 #     int i;
