@@ -36,6 +36,7 @@ class Analyzer(object):
         self.env = Environment()
 
 
+    # generate Decl object
     def analyze_declaration(self, declaration_node, declarator, level): # for ast.Declaration
         print("Begin analyzing declaration.")
         # 抽象構文木をたどって変数名を取ってくる
@@ -47,12 +48,23 @@ class Analyzer(object):
             elif isinstance(declarator.direct_declarator, ast.DirectArrayDeclarator):
                 objtype = ("array", "int", declarator.direct_declarator.constant.value)
         elif declarator.kind == "POINTER":
+            # if self.env.lookup(name) == None:
+                # sys.stderr.write("Error - No instance referenced by pointer {0}.\n".format(name))
+            # else:
+                # referenced = self.env.lookup(name)
+                # if referenced.kind == "var" or referenced.kind == "param":
+                    # declarator.direct_declarator.identifier.identifier = referenced
+                # elif referenced.kind == "fun":
+                    # sys.stderr.write("Error - Pointer for variable {0} references function.\n".format(name))
+
             if isinstance(declarator.direct_declarator, ast.DirectDeclarator):
                 objtype = ("pointer", "int")
             elif isinstance(declarator.direct_declarator, ast.DirectArrayDeclarator):
                 objtype = ("pointer", "array")
 
         decl_decl = Decl(name, level, "var", objtype)
+        # これでいいのか？
+        declarator.direct_declarator.identifier.identifier = decl_decl
 
         # for debug
         print("new Decl class object of declaration: {0}".format(decl_decl))
@@ -153,7 +165,6 @@ class Analyzer(object):
         return decl_param
 
 
-
     def analyze(self, nodelist, level=0):
         if isinstance(nodelist, ast.ExternalDeclarationList):
             print("Analyze nodes in external declaration list.")
@@ -195,7 +206,7 @@ class Analyzer(object):
                         print("OK: Prototype declaration after function definition, type consisntent")
                         self.env.add(decl_proto)
                 elif existing_decl.kind == "proto":
-                    if existing_decl.objtype != decl_proto.objtype:
+                    if existing_decl.objtype[1] != decl_proto.objtype[1]:
                         sys.stderr.write("Error: Type inconsintency of duplicate prototype definition - {0}\n".format(decl_proto.name))
                     else:
                         print("OK: Duplicate prototype declaration, but type consistent")
@@ -231,7 +242,10 @@ class Analyzer(object):
                         print("OK: Duplicate function definition and variable declaration, but they are at different level.")
                         self.env.add(decl_funcdef)
             print("")
+            print("Begin analyzing parameter in function definition.")
             self.analyze(nodelist.function_declarator.parameter_type_list, level+1)
+            print("Begin analyzing compound statement in function definition.")
+            self.analyze(nodelist.compound_statement, level+1)
 
         elif isinstance(nodelist, ast.ParameterTypeList):
             for paramdec in nodelist.nodes:
@@ -250,6 +264,42 @@ class Analyzer(object):
                         self.env.add(decl_param)
                 print("")
 
+        elif isinstance(nodelist, ast.CompoundStatement):
+            print("Analyzing compound statement...")
+            for declaration in nodelist.declaration_list.nodes:
+                self.analyze(declaration, level)
+                print("Declaration in compound statement {0}".format(type(declaration)))
+            for statement in nodelist.statement_list.nodes:
+                self.analyze(statement, level)
+                print("Statement in compound statement {0}".format(type(statement)))
+
+        elif isinstance(nodelist, ast.DeclaratorList):
+            for declaration in nodelist.nodes:
+                self.analyze(declaration, level)
+
+        elif isinstance(nodelist, ast.StatementList):
+            for statement in nodelist.nodes:
+                self.analyze(statement, level)
+
+        elif isinstance(nodelist, ast.ExpressionStatement):
+            print("Analyze expression.")
+            print("")
+
+        elif isinstance(nodelist, ast.IfStatement):
+            print("Analyze if statement.")
+            print("")
+
+        elif isinstance(nodelist, ast.WhileLoop):
+            print("Analyze while statement.")
+            print("")
+
+        elif isinstance(nodelist, ast.ForLoop):
+            print("Analyze for statement.")
+            print("")
+
+        elif isinstance(nodelist, ast.ReturnStatement):
+            print("Analyze return statement.")
+            print("")
 
 
         return self.env
