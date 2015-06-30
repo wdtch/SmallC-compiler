@@ -1,5 +1,8 @@
-# import unittest
-from parser import Parser
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+from __future__ import unicode_literals
+# from parser import Parser
 
 testcode1 = """
 int func(int a, int b) {
@@ -35,42 +38,42 @@ void func(int a, int b) {
 """
 
 testcode3 = """
-void bubble_sort(int *data) {
-    int i, j, tmp;
-    for (i = 0; i < AMOUNT - 1; i++) {
-        for (j = AMOUNT - 1; j > i; j--) {
-            if (data[j-1] > data[j]) {
-                tmp = data[j];
-                data[j] = data[j-1];
-                data[j-1] = tmp;
-            }
-        }
-    }
-}
+void bubble_sort(int *data) {\n
+    int i, j, tmp;\n
+    for (i = 0; i < AMOUNT - 1; i++) {\n
+        for (j = AMOUNT - 1; j > i; j--) {\n
+            if (data[j-1] > data[j]) {\n
+                tmp = data[j];\n
+                data[j] = data[j-1];\n
+                data[j-1] = tmp;\n
+            }\n
+        }\n
+    }\n
+}\n
 
-int main() {
-    int i;
-
-    /* initialize */
-    data[0] = 3;
-    data[1] = 5;
-    data[2] = 10;
-    data[3] = 7;
-    data[4] = 1;
-    data[5] = 4;
-    data[6] = 12;
-    data[7] = 6;
-
-    /* sort */
-    bubble_sort(data);
-
-    /* print */
-    for (i = 0; i < AMOUNT; i++) {
-        print(&data[i]);
-    }
-
-    return 0;
-}
+int main() {\n
+    int i;\n
+\n
+    /* initialize */\n
+    data[0] = 3;\n
+    data[1] = 5;\n
+    data[2] = 10;\n
+    data[3] = 7;\n
+    data[4] = 1;\n
+    data[5] = 4;\n
+    data[6] = 12;\n
+    data[7] = 6;\n
+\n
+    /* sort */\n
+    bubble_sort(data);\n
+\n
+    /* print */\n
+    for (i = 0; i < AMOUNT; i++) {\n
+        print(&data[i]);\n
+    }\n
+\n
+    return 0;\n
+}\n
 
 """
 
@@ -109,6 +112,7 @@ void func4(int a, int a); /* duplicate param declaration */
 
 int main() {
     int i;
+    i = 0;
     return i;
 }
 
@@ -120,5 +124,42 @@ int main(int i) {
 /* duplicate with variable declaration */
 void i() {
     ;
+}
+
+/* illegal operand of pointer */
+void func() {
+    func1(&func2);
+}
+"""
+
+# 式検査の動作チェック用コード
+testcode7 = """
+int global;
+int inc(int a);
+void func_stmtcheck();
+int return_void(int a);
+void return_int(int a);
+
+int inc(int a) {
+    return a+1;
+}
+
+void func_stmtcheck() {
+    int array[5];
+    int i;
+    void j;
+
+    array = 0;
+    inc = 1;
+    i = &inc;
+}
+
+int return_void(int r) {
+    int tmp;
+    tmp = r;
+}
+
+void return_int(int v) {
+    return v;
 }
 """
