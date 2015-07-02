@@ -11,6 +11,7 @@ from lexer import Lexer
 import ast
 import restorecode
 import parsertest
+import semantic_analyzer
 
 
 class Parser(object):
@@ -455,67 +456,106 @@ class Parser(object):
 
         # ここから単体テスト
         if __name__ == '__main__':
-            # testcode1をパース、復元
-            print("Parse and restore code1.")
-            try:
-                s = """void print(int i);""" + parsertest.testcode1
-            except EOFError:
-                print("EOF Error!(;_;)")
-            # パース
-            result = self.parser.parse(s)
-            # コード復元部
-            restorecode.restore_code(result)
-            print("")
+            print("choose test.")
+            # select = raw_input()
+            # selecting testcode6 for testing semantic analyzer
+            select = "7"
+            if select == "1":
+                # testcode1をパース、復元
+                print("Parse and restore code1.")
+                try:
+                    s = """void print(int i);""" + parsertest.testcode1
+                except EOFError:
+                    print("EOF Error!(;_;)")
+                # パース
+                result = self.parser.parse(s)
+                # コード復元部
+                restorecode.restore_code(result)
+                print("")
 
+            elif select == "2":
+                # testcode2をパース、復元
+                print("Parse and restore code2.")
+                try:
+                    s = """void print(int i);""" + parsertest.testcode2
+                except EOFError:
+                    print("EOF Error!(;_;)")
+                # パース
+                result = self.parser.parse(s)
+                # コード復元部
+                restorecode.restore_code(result)
+                print("")
 
-            # testcode2をパース、復元
-            print("Parse and restore code2.")
-            try:
-                s = """void print(int i);""" + parsertest.testcode2
-            except EOFError:
-                print("EOF Error!(;_;)")
-            # パース
-            result = self.parser.parse(s)
-            # コード復元部
-            restorecode.restore_code(result)
-            print("")
+            elif select == "3":
+                # testcode3をパース、復元
+                print("Parse and restore code3.")
+                try:
+                    s = """void print(int i);\n""" + parsertest.testcode3
+                except EOFError:
+                    print("EOF Error!(;_;)")
+                # パース
+                result = self.parser.parse(s)
+                # コード復元部
+                restorecode.restore_code(result)
+                print("")
 
+            elif select == "4":
+                # testcode4をパース、復元
+                print("Parse and restore code4.")
+                try:
+                    s = """void print(int i);""" + parsertest.testcode4
+                except EOFError:
+                    print("EOF Error!(;_;)")
+                # パース
+                result = self.parser.parse(s)
+                # コード復元部
+                restorecode.restore_code(result)
+                print("")
 
-            # testcode3をパース、復元
-            print("Parse and restore code3.")
-            try:
-                s = """void print(int i);""" + parsertest.testcode3
-            except EOFError:
-                print("EOF Error!(;_;)")
-            # パース
-            result = self.parser.parse(s)
-            # コード復元部
-            restorecode.restore_code(result)
-            print("")
+            elif select == "5":
+                # testcode5をパース、復元
+                print("Parse and restore code5.")
+                try:
+                    s = """void print(int i);""" + parsertest.testcode5
+                except EOFError:
+                    print("EOF Error!(;_;)")
+                # パース
+                result = self.parser.parse(s)
+                # コード復元部
+                restorecode.restore_code(result)
+                print("")
 
-            # testcode4をパース、復元
-            print("Parse and restore code4.")
-            try:
-                s = """void print(int i);""" + parsertest.testcode4
-            except EOFError:
-                print("EOF Error!(;_;)")
-            # パース
-            result = self.parser.parse(s)
-            # コード復元部
-            restorecode.restore_code(result)
-            print("")
+            elif select == "6":
+                # testcode6をパース、復元→意味解析へ
+                print("Parse and restore code6.")
+                try:
+                    s = parsertest.testcode6
+                except EOFError:
+                    print("EOF Error!(;_;)")
+                # パース
+                result = self.parser.parse(s)
+                # コード復元部
+                restorecode.restore_code(result)
+                print("")
 
-            # testcode5をパース、復元
-            print("Parse and restore code5.")
-            try:
-                s = """void print(int i);""" + parsertest.testcode5
-            except EOFError:
-                print("EOF Error!(;_;)")
-            # パース
-            result = self.parser.parse(s)
-            # コード復元部
-            restorecode.restore_code(result)
-            print("")
+            elif select == "7":
+                # testcode6をパース、復元→意味解析へ
+                print("Parse and restore code7.")
+                try:
+                    s = parsertest.testcode7
+                except EOFError:
+                    print("EOF Error!(;_;)")
+                # パース
+                result = self.parser.parse(s)
+                # コード復元部
+                restorecode.restore_code(result)
+                print("")
+
+            analyzer = semantic_analyzer.Analyzer(result)
+            env = analyzer.analyze(analyzer.nodelist)
+            e_msg, w_msg, e_cnt, w_cnt = analyzer.check_type(analyzer.nodelist, env)
+            error_mng = semantic_analyzer.ErrorManager(e_msg, w_msg, e_cnt, w_cnt)
+            error_mng.print_error()
 
 myparser = Parser()
 myparser.build()
