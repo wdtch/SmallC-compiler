@@ -73,7 +73,6 @@ class Analyzer(object):
                 objtype = ("pointer", "array")
 
         decl_decl = Decl(name, level, "var", objtype)
-        # これでいいのか？
         declarator.direct_declarator.identifier.identifier = decl_decl
 
         return decl_decl
@@ -147,7 +146,6 @@ class Analyzer(object):
                 self.analyze(node, level)
 
         elif isinstance(nodelist, ast.Declaration):
-            # vardecl_list = []
             for declarator in nodelist.declarator_list.nodes:
                 decl_decl = self.analyze_declaration(
                     nodelist, declarator, level)
@@ -165,7 +163,7 @@ class Analyzer(object):
                         else:
                             self.env.add(decl_decl)
                     elif existing_decl.kind == "var":
-                        if existing_decl.level == decl_decl.level and self.env.decl_list.index(existing_decl):
+                        if existing_decl.level == decl_decl.level:
                             self.error_msg += "Error - Duplicate declaration - {0}\n".format(
                                 decl_decl.name)
                             self.error_count += 1
@@ -233,10 +231,13 @@ class Analyzer(object):
                     else:
                         self.env.add(decl_funcdef)
 
-            func_index = self.env.decl_list.index(decl_funcdef)
-            self.analyze(
+            try:
+                func_index = self.env.decl_list.index(decl_funcdef)
+                self.analyze(
                 nodelist.function_declarator.parameter_type_list, level+1, func_index)
-            self.analyze(nodelist.compound_statement, level+2, func_index)
+                self.analyze(nodelist.compound_statement, level+2, func_index)
+            except ValueError:
+                pass
 
         elif isinstance(nodelist, ast.ParameterTypeList):
             param_list = []
@@ -293,10 +294,7 @@ class Analyzer(object):
             self.analyze(nodelist.left, level)
             self.analyze(nodelist.right, level)
 
-            # TODO: 左辺、右辺が変数、定数、ポインタ、配列要素、関数呼び出し
             # 式の形の検査
-            # if isinstance(nodelist.left.identifier, Decl):
-            #     binop_left = self.env.lookup(nodelist.left.identifier.name)
             if isinstance(nodelist, ast.Identifier):
                 binop_left = self.env.lookup(nodelist.left.identifier.name)
 
@@ -313,6 +311,7 @@ class Analyzer(object):
         elif isinstance(nodelist, ast.Address):
             self.analyze(nodelist.expression, level)
 
+            # 式の形の検査
             exp = self.env.lookup(nodelist.expression.identifier)
             if exp.kind != "var":
                 self.error_msg += "Error - Illegal operand of pointer.\n"
@@ -366,7 +365,7 @@ class Analyzer(object):
 
         # top level
         elif isinstance(nodelist, ast.ExternalDeclarationList):
-            for count, node in enumerate(nodelist.nodes):
+            for node in nodelist.nodes:
                 self.check_type(node, env)
 
         # declaration
@@ -381,7 +380,7 @@ class Analyzer(object):
             self.check_type(nodelist.direct_declarator, env)
 
         elif isinstance(nodelist, ast.DirectDeclarator):
-            decl = env.lookup(nodelist.identifier.identifier.name)
+            pass
 
         elif isinstance(nodelist, ast.FunctionPrototype):
             pass
@@ -451,8 +450,6 @@ class Analyzer(object):
                 if self.check_type(nodelist.left, env) == self.check_type(nodelist.right, env):
                     return self.check_type(nodelist.left, env)
                 else:
-                    # type_left = self.check_type(nodelist.left, env)
-                    # type_right = self.check_type(nodelist.right, env)
                     self.error_msg += "Error - Type inconsintency between left-hand {0} and right-hand {1} of assign expression.\n".format(nodelist.left, nodelist.right)
                     self.error_count += 1
 
@@ -575,5 +572,4 @@ class ErrorManager(object):
             sys.stderr.write(self.warning_msg)
 
         if not self.error_msg == "":
-            # 後々sys.exit(...)に書き換える
-            sys.stderr.write(self.error_msg)
+            sys.exit(self.error_msg)
