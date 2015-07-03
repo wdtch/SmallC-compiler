@@ -6,6 +6,7 @@
 from __future__ import unicode_literals
 import sys
 import ast
+import logging
 
 
 class Decl(object):
@@ -56,8 +57,8 @@ class Analyzer(object):
 
         # void型変数をはねる(型検査を埋め込み)
         if declaration_node.type_specifier.type_specifier == "void":
-            self.error_msg += "Error - Type of variable {0} must not be \"void\" at line {1}.\n".format(
-                name, declarator.direct_declarator.identifier.lineno)
+            logging.error("Type of variable {0} must not be \"void\" at line {1}.".format(
+                name, declarator.direct_declarator.identifier.lineno))
             self.error_count += 1
 
         if declarator.kind == "NORMAL":
@@ -82,7 +83,7 @@ class Analyzer(object):
 
     def analyze_func_prototype(self, proto_node, level):
         if level != 0:
-            self.error_msg += "Prototype function declaration is available only at top-level.\n"
+            logging.error("Prototype function declaration is available only at top-level.")
             self.error_count += 1
         else:
             # 抽象構文木をたどって関数名を取ってくる
@@ -106,7 +107,7 @@ class Analyzer(object):
 
     def analyze_func_definition(self, funcdef_node, level):
         if level != 0:
-            error_msg += "Function definition is available only at top-level.\n"
+            logging.error("Function definition is available only at top-level.")
             error_count += 1
         else:
             # 抽象構文木をたどって関数名を取ってくる
@@ -157,20 +158,20 @@ class Analyzer(object):
                         decl_decl.name, scope_index)
                     if existing_decl.kind == "fun" or existing_decl.kind == "proto":
                         if existing_decl.level == 0:
-                            self.error_msg += "Error - {0} is defined as a function.\n".format(
-                                decl_decl.name)
+                            logging.error("{0} is defined as a function.".format(
+                                decl_decl.name))
                             self.error_count += 1
                         else:
                             self.env.add(decl_decl)
                     elif existing_decl.kind == "var":
                         if existing_decl.level == decl_decl.level:
-                            self.error_msg += "Error - Duplicate declaration - {0}\n".format(
-                                decl_decl.name)
+                            logging.error("Duplicate declaration - {0}".format(
+                                decl_decl.name))
                             self.error_count += 1
                     elif existing_decl.kind == "param":
                         self.env.add(decl_decl)
-                        self.warning_msg += "Warning - This variable declaration is duplicated - param {0}\n".format(
-                            existing_decl.name)
+                        logging.warning("This variable declaration is duplicated - param {0}".format(
+                            existing_decl.name))
                         self.warning_count += 1
 
         elif isinstance(nodelist, ast.FunctionPrototype):
@@ -182,22 +183,22 @@ class Analyzer(object):
 
                 if existing_decl.kind == "fun":
                     if existing_decl.objtype != decl_proto.objtype:
-                        self.error_msg += "Error - Conflicting {0} prototype definition with {1} function.\n".format(
-                            decl_proto.type, existing_decl.type)
+                        logging.error("Conflicting {0} prototype definition with {1} function.".format(
+                            decl_proto.type, existing_decl.type))
                         self.error_count += 1
                     else:
                         self.env.add(decl_proto)
                 elif existing_decl.kind == "proto":
                     if existing_decl.objtype[1] != decl_proto.objtype[1]:
-                        self.error_msg += "Error - Type inconsintency of duplicate prototype definition - {0}\n".format(
-                            decl_proto.name)
+                        logging.error("Type inconsintency of duplicate prototype definition - {0}".format(
+                            decl_proto.name))
                         self.error_count += 1
                     else:
                         self.env.add(decl_proto)
                 elif existing_decl.kind == "var":
                     if existing_decl.level == 0:
-                        self.error_msg += "Error - Duplicate prototype declaration with global variable: {0}\n".format(
-                            decl_proto.name)
+                        logging.error("Duplicate prototype declaration with global variable: {0}".format(
+                            decl_proto.name))
                         self.error_count += 1
                     else:
                         self.env.add(decl_proto)
@@ -213,20 +214,20 @@ class Analyzer(object):
                 existing_decl = self.env.lookup(decl_funcdef.name)
 
                 if existing_decl.kind == "fun":
-                    self.error_msg += "Error - Duplicate function definition - {0}.\n".format(
-                        decl_funcdef.name)
+                    logging.error("Duplicate function definition - {0}.".format(
+                        decl_funcdef.name))
                     self.error_count += 1
                 elif existing_decl.kind == "proto":
                     if existing_decl.objtype != decl_funcdef.objtype:
-                        self.error_msg += "Error - Type inconsintency of function prototype and function definition - {0}\n".format(
-                            decl_funcdef.name)
+                        logging.error("Type inconsintency of function prototype and function definition - {0}".format(
+                            decl_funcdef.name))
                         self.error_count += 1
                     else:
                         self.env.add(decl_funcdef)
                 elif existing_decl.kind == "var":
                     if existing_decl.level == 0:
-                        self.error_msg += "Error - Duplicate function definition with global variable - {0}\n".format(
-                            decl_funcdef.name)
+                        logging.error("Duplicate function definition with global variable - {0}".format(
+                            decl_funcdef.name))
                         self.error_count += 1
                     else:
                         self.env.add(decl_funcdef)
@@ -248,8 +249,8 @@ class Analyzer(object):
                 # 重複チェック
                 for param_into_env in param_list:
                     if decl_param.name == param_into_env.name:
-                        self.error_msg += "Error - This parameter declaration is duplicated - param {0}\n".format(
-                            decl_param.name)
+                        logging.error("This parameter declaration is duplicated - param {0}".format(
+                            decl_param.name))
                         self.error_count += 1
                 param_list.append(decl_param)
 
@@ -277,8 +278,8 @@ class Analyzer(object):
 
         elif isinstance(nodelist, ast.FunctionExpression):
             if self.env.lookup(nodelist.identifier.identifier) is None:
-                self.error_msg += "Error - Referencing undeclared function {0} at line {1}.\n".format(
-                    nodelist.identifier.identifier, nodelist.lineno)
+                logging.error("Referencing undeclared function {0} at line {1}.".format(
+                    nodelist.identifier.identifier, nodelist.lineno))
                 self.error_count += 1
             else:
                 existing_decl = self.env.lookup(
@@ -286,8 +287,8 @@ class Analyzer(object):
                 if existing_decl.kind == "fun":
                     nodelist.identifier = existing_decl
                 elif existing_decl.kind == "var" or existing_decl.kind == "param":
-                    self.error_msg += "Error - Referencing variable {0} as a function at line {1}.\n".format(
-                        nodelist.identifier.identifier, nodelist.lineno)
+                    logging.error("Referencing variable {0} as a function at line {1}.".format(
+                        nodelist.identifier.identifier, nodelist.lineno))
                     self.error_count += 1
 
         elif isinstance(nodelist, ast.BinaryOperators):
@@ -300,12 +301,12 @@ class Analyzer(object):
 
                 if nodelist.op == "ASSIGN":
                     if not binop_left.kind == "var":
-                        self.error_msg += "Error - Invalid type at left-hand side of assignment: {0} at line {1}\n".format(
-                            binop_left.name, nodelist.left.lineno)
+                        logging.error("Invalid type at left-hand side of assignment: {0} at line {1}".format(
+                            binop_left.name, nodelist.left.lineno))
                         self.error_count += 1
                     elif binop_left.objtype[0] == "array":
-                        self.error_msg += "Error - Variable at left-hand side of assignment must not be array type: line {0}\n".format(
-                            nodelist.left.lineno)
+                        logging.error("Variable at left-hand side of assignment must not be array type: line {0}".format(
+                            nodelist.left.lineno))
                         self.error_count += 1
 
         elif isinstance(nodelist, ast.Address):
@@ -314,7 +315,7 @@ class Analyzer(object):
             # 式の形の検査
             exp = self.env.lookup(nodelist.expression.identifier)
             if exp.kind != "var":
-                self.error_msg += "Error - Illegal operand of pointer.\n"
+                logging.error("Illegal operand of pointer.")
                 self.error_count += 1
 
         elif isinstance(nodelist, ast.Pointer):
@@ -327,15 +328,15 @@ class Analyzer(object):
                 id_name = nodelist.identifier.name
 
             if self.env.lookup(id_name) is None:
-                self.error_msg += "Error - Referencing undeclared variable {0} at line {1}.\n".format(
-                    id_name, nodelist.lineno)
+                logging.error("Referencing undeclared variable {0} at line {1}.".format(
+                    id_name, nodelist.lineno))
                 self.error_count += 1
             else:
                 existing_decl = self.env.lookup(id_name)
 
                 if existing_decl.kind == "fun":
-                    self.error_msg += "Error - Referencing function {0} as a variable at {1}.\n".format(
-                        nodelist.identifier, nodelist.lineno)
+                    logging.error("Referencing function {0} as a variable at {1}.".format(
+                        nodelist.identifier, nodelist.lineno))
                     self.error_count += 1
                 elif existing_decl.kind == "var" or existing_decl.kind == "param":
                     nodelist.identifier = existing_decl
@@ -396,18 +397,18 @@ class Analyzer(object):
                         # void
                         if isinstance(stmt_node.return_statement, ast.NullNode):
                             if nodelist.type_specifier.type_specifier == "int":
-                                self.error_msg += "Error - Void-type return but int-type function definition {0} at line {1}.\n".format(
-                                    nodelist.function_declarator.identifier.identifier, nodelist.function_declarator.identifier.lineno)
+                                logging.error("Void-type return but int-type function definition {0} at line {1}.".format(
+                                    nodelist.function_declarator.identifier.identifier, nodelist.function_declarator.identifier.lineno))
                                 self.error_count += 1
                         else:
                             if nodelist.type_specifier.type_specifier == "void":
-                                self.error_msg += "Error - Int-type return but void-type function definition {0} at line {1}.\n".format(
-                                    nodelist.function_declarator.identifier.identifier, nodelist.function_declarator.identifier.lineno)
+                                logging.error("Int-type return but void-type function definition {0} at line {1}.".format(
+                                    nodelist.function_declarator.identifier.identifier, nodelist.function_declarator.identifier.lineno))
                                 self.error_count += 1
             if not return_exists:  # return文がなかったとき
                 if nodelist.type_specifier.type_specifier == "int":
-                    self.error_msg += "Error - Void-type return but int-type function definition {0} at line {1}.\n".format(
-                        nodelist.function_declarator.identifier.identifier, nodelist.function_declarator.identifier.lineno)
+                    logging.error("Void-type return but int-type function definition {0} at line {1}.".format(
+                        nodelist.function_declarator.identifier.identifier, nodelist.function_declarator.identifier.lineno))
                     self.error_count += 1
 
             # 関数定義内の複文の型チェック
@@ -430,14 +431,14 @@ class Analyzer(object):
 
         elif isinstance(nodelist, ast.IfStatement):
             if not self.check_type(nodelist.expression, env) == "int":
-                self.error_msg += "Error - Expression of if statement must return int-type.\n"
+                logging.error("Expression of if statement must return int-type.")
                 self.error_count += 1
             self.check_type(nodelist.then_statement, env)
             self.check_type(nodelist.else_statement, env)
 
         elif isinstance(nodelist, ast.WhileLoop):
             if not self.check_type(nodelist.expression) == "int":
-                self.error_msg += "Error - Expression of while statement must return int-type.\n"
+                logging.error("Expression of while statement must return int-type.")
                 self.error_count += 1
             self.check_type(nodelist.statement, env)
 
@@ -450,14 +451,14 @@ class Analyzer(object):
                 if self.check_type(nodelist.left, env) == self.check_type(nodelist.right, env):
                     return self.check_type(nodelist.left, env)
                 else:
-                    self.error_msg += "Error - Type inconsintency between left-hand {0} and right-hand {1} of assign expression.\n".format(nodelist.left, nodelist.right)
+                    logging.error("Type inconsintency between left-hand {0} and right-hand {1} of assign expression.".format(nodelist.left, nodelist.right))
                     self.error_count += 1
 
             elif nodelist.op == "AND" or nodelist.op == "OR":
                 if self.check_type(nodelist.left, env) == "int" and self.check_type(nodelist.right, env) == "int":
                     return "int"
                 else:
-                    self.error_msg += "Error - Type inconsisntency of logical expression.\n"
+                    logging.error("Type inconsisntency of logical expression.")
                     self.error_count += 1
 
             elif nodelist.op == "EQUAL" \
@@ -469,7 +470,7 @@ class Analyzer(object):
                 if self.check_type(nodelist.left, env) == self.check_type(nodelist.right, env):
                     return "int"
                 else:
-                    self.error_msg += "Error - Type inconsintency between left-hand and right-hand of assign expression.\n"
+                    logging.error("Type inconsintency between left-hand and right-hand of assign expression.")
                     self.error_count += 1
 
             elif nodelist.op == "PLUS" \
@@ -481,7 +482,7 @@ class Analyzer(object):
                         or self.check_type(nodelist.left, env) == ("pointer", "int") and self.check_type(nodelist.right, env) == "int":
                     return ("pointer", "int")
                 else:
-                    self.error_msg += "Error - Type inconsintency of calculation operands.\n"
+                    logging.error("Type inconsintency of calculation operands.")
                     self.error_count += 1
 
             elif nodelist.op == "MINUS":
@@ -490,21 +491,21 @@ class Analyzer(object):
                 elif self.check_type(nodelist.left, env) == ("pointer", "int") and self.check_type(nodelist.right, env) == "int":
                     return ("pointer", "int")
                 else:
-                    self.error_msg += "Error - Type inconsintency of calculation operands.\n"
+                    logging.error("Type inconsintency of calculation operands.")
                     self.error_count += 1
 
         elif isinstance(nodelist, ast.Address):
             if self.check_type(nodelist.expression, env) == "int":
                 return ("pointer", "int")
             else:
-                self.error_msg += "Error - Invalid type for operand of pointer expression.\n"
+                logging.error("Invalid type for operand of pointer expression.")
                 self.error_count += 1
 
         elif isinstance(nodelist, ast.Pointer):
             if self.check_type(nodelist.expression, env) == ("pointer", "int"):
                 return "int"
             else:
-                self.error_msg += "Error - Invalid operand of *( ), not a pointer type."
+                logging.error("Invalid operand of *( ), not a pointer type.")
 
         elif isinstance(nodelist, ast.FunctionExpression):
             if isinstance(nodelist.identifier, ast.Identifier):
@@ -519,12 +520,12 @@ class Analyzer(object):
             else:
                 arglen = len(nodelist.argument_expression.nodes)
             if arglen > len(func_decl.objtype[2:]):
-                self.error_msg += "Error - Too many arguments for function {0}.\n".format(
-                    func_decl.name)
+                logging.error("Too many arguments for function {0}.".format(
+                    func_decl.name))
                 self.error_count += 1
             elif arglen < len(func_decl.objtype[2:]):
-                self.error_msg += "Error - Too few arguments for function {0}.\n".format(
-                    func_decl.name)
+                logging.error("Too few arguments for function {0}.".format(
+                    func_decl.name))
                 self.error_count += 1
             else:  # 引数の個数が一致したとき
                 # 引数の型チェック
@@ -534,8 +535,8 @@ class Analyzer(object):
                     for i, argnode in enumerate(nodelist.argument_expression.nodes):
                         if not self.check_type(argnode, env) == func_decl.objtype[2+i]:
                             ill_type = self.check_type(argnode, env)
-                            self.error_msg += "Error - Taking {0} type argument for function {1}: correct type is {2}.\n".format(
-                                ill_type, func_decl.name. func_decl.objtype[2+i])
+                            logging.error("Taking {0} type argument for function {1}: correct type is {2}.".format(
+                                ill_type, func_decl.name. func_decl.objtype[2+i]))
                             self.error_count += 1
                     else:
                         return func_decl.objtype[1]
