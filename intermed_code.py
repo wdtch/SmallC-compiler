@@ -141,9 +141,7 @@ class IntermedCodeGenerator(object):
     def intermed_code_generator(self, nodelist):
         """抽象構文木を引数として受け取り、再帰的に抽象構文木のノードを
            辿りながら、ノードの種類に応じて中間表現を生成しリストに加える"""
-        if isinstance(nodelist, ast.ExternalDeclarationList):
-            for node in nodelist.nodes:
-                self.intermed_code_generator(node)
+           pass
 
     def intermed_code_vardecl(self, decl):
         """Declarationを表す抽象構文木のノードを中間命令列に変換する
