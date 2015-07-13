@@ -137,22 +137,25 @@ class IntermedCodeTest(TestCase):
         intermed_write = ic.WriteStatement(self.decl_temp0, self.decl_temp1)
         expected = [let_x_p, let_1, intermed_write]
 
-        ast_x = ast.Identifier(self.decl_x, 1) # ほんまか？Decl？
+        ast_x = ast.Identifier(decl_x_p, 1) # ほんまか？Decl？
         ast_x_p = ast.Pointer(ast_x)
-        ast_2 = ast.Number(2)
-        actual = self.icg.intermed_code_statement(ast.BinaryOperators("ASSIGN", ast_x_p, ast_2))
+        ast_1 = ast.Number(1)
+        actual = self.icg.intermed_code_statement(ast.BinaryOperators("ASSIGN", ast_x_p, ast_1))
 
         nose.tools.ok_(expected == actual)
 
     def test_readstmt(self): # わからん
         """x = *y;の中間表現テスト"""
+        varexp_x = ic.VarExpression(self.decl_x)
+        let_x = ic.LetStatement(self.decl_temp0, varexp_x)
         decl_y_p = sa.Decl("y", 0, "var", ("pointer", "int"))
-        let_y_p = ic.LetStatement(self.decl_temp0, decl_y_p)
-        intermed_read = ic.ReadStatement(self.decl_x, self.decl_temp0) # *yに対応するself.decl_y?
-        expected = [let_y_p, intermed_read]
+        varexp_y_p = ic.VarExpression(decl_y_p)
+        let_y_p = ic.LetStatement(self.decl_temp1, varexp_y_p)
+        intermed_read = ic.ReadStatement(self.decl_temp0, self.decl_temp1) # *yに対応するself.decl_y?
+        expected = [let_x, let_y_p, intermed_read]
 
         ast_x = ast.Identifier(self.decl_x, 1) # Decl?
-        ast_y = ast.Identifier(self.decl_y, 2) # Decl?
+        ast_y = ast.Identifier(decl_y_p, 2) # Decl?
         ast_y_p = ast.Pointer(ast_y)
         actual = self.icg.intermed_code_statement(ast.BinaryOperators("ASSIGN", ast_x, ast_y_p))
 
