@@ -297,6 +297,8 @@ class IntermedCodeGenerator(object):
                 itmd_relop_let = LetStatement(x, itmd_relop)
                 relop_list = [itmd_left, itmd_right, itmd_relop_let]
                 itmd_explist = relop_list
+            else:
+                print("nanka akan with BinaryOperators.")
 
         elif isinstance(exp, ast.Address):
             intermed_varp = AddressExpression(exp.expression.identifier)
@@ -310,7 +312,41 @@ class IntermedCodeGenerator(object):
            引数として変換する文のノードをとる
            返り値として変換結果の中間命令列のリストを返す"""
         itmd_stmtlist = []
-        return itmd_stmtlist
+        if isinstance(statement, ast.NullNode):
+            itmd_stmtlist.append(EmptyStatement())
+
+        elif isinstance(statement, ast.BinaryOperators) and \
+             statement.op == "ASSIGN":
+                # x = y
+                if isinstance(statement.left, ast.Identifier):
+                    # x = *y
+                    if isinstance(statement.right, ast.Pointer):
+                        p1 = self.tvg.newvardecl()
+                        p2 = self.tvg.newvardecl()
+                        let_left = self.intermed_code_exp(p1, statement.left)
+                        let_right = self.intermed_code_exp(p2, statement.right.expression)
+                        itmd_stmtlist.append(let_left)
+                        itmd_stmtlist.append(let_right)
+                        itmd_stmtlist.append(ReadStatement(p1, p2))
+                    else:
+                        x = statement.left.identifier
+                        e = statement.right
+                        itmd_stmtlist.append(self.intermed_code_exp(x, e))
+
+                # *x = y
+                elif isinstance(statement.left, ast.Pointer):
+                    p1 = self.tvg.newvardecl()
+                    p2 = self.tvg.newvardecl()
+                    let_left = self.intermed_code_exp(p1, statement.left.expression)
+                    let_right = self.intermed_code_exp(p2, statement.right)
+                    itmd_stmtlist.append(let_left)
+                    itmd_stmtlist.append(let_right)
+                    itmd_stmtlist.append(WriteStatement(p1, p2))
+
+        elif isinstance(statement, ast.IfStatement):
+            pass
+
+        return flatten(itmd_stmtlist)
 
     def intermed_code_fundef(self, fundef):
         """FunctionDefinitionを表す抽象構文木のノードを中間命令列に変換する
