@@ -11,7 +11,7 @@ import intermed_code as ic
 class AssignAddrTest(TestCase):
 
     def setUp(self):
-        self.assignaddr = a_addr.AssignAddress()
+        self.assignaddr = a_addr.AssignAddress([])
 
         self.vardecl_x = ic.VarDecl(sa.Decl("x", 2, "var", "int"))
         self.vardecl_y = ic.VarDecl(sa.Decl("y", 2, "var", "int"))
@@ -39,7 +39,7 @@ class AssignAddrTest(TestCase):
 
         # void f(int, int)
         self.decl_f = sa.Decl(
-            "f", 0, "fun", ("fun", "void", "int", "int"), offset)
+            "f", 0, "fun", ("fun", "void", "int", "int"))
 
     def tearDown(self):
         pass
@@ -88,7 +88,7 @@ class AssignAddrTest(TestCase):
         nose.tools.eq_(expected_y, self.paramdecl_y.offset)
         nose.tools.eq_(expected_y, currentofs)
 
-    def test_assign_globalvar_x(self):
+    def test_globalvar_x(self):
         """グローバル変数xに対するアドレス割り当てテスト"""
         expected_x = -4
 
@@ -98,7 +98,7 @@ class AssignAddrTest(TestCase):
         nose.tools.eq_(expected_x, self.globaldecl_x.offset)
         nose.tools.eq_(expected_x, currentofs)
 
-    def test_assign_globalvar_xy(self):
+    def test_globalvar_xy(self):
         """グローバル変数xとyに対するアドレス割り当てテスト"""
         expected_x = -4
         expected_y = -8
@@ -116,7 +116,7 @@ class AssignAddrTest(TestCase):
         expected_x = -20
 
         self.arraydecl_x.offset = self.assignaddr.ofs_to_arrayvar(
-            self.arraydecl_x.objtype[2])
+            self.arraydecl_x.var.objtype[2])
         currentofs = self.assignaddr.ofsman.current_offset
 
         nose.tools.eq_(expected_x, self.arraydecl_x.offset)
@@ -156,7 +156,7 @@ class AssignAddrTest(TestCase):
         expected_x = 20
 
         self.arrayparam_x.offset = self.assignaddr.ofs_to_arrayparam(
-            self.arrayparam_x.objtype[2])
+            self.arrayparam_x.var.objtype[2])
         currentofs = self.assignaddr.ofsman.current_offset
 
         nose.tools.eq_(expected_x, self.arrayparam_x.offset)
@@ -168,9 +168,9 @@ class AssignAddrTest(TestCase):
         expected_y = 32
 
         self.arrayparam_x.offset = self.assignaddr.ofs_to_arrayparam(
-            self.arrayparam_x.objtype[2])
+            self.arrayparam_x.var.objtype[2])
         self.arrayparam_y.offset = self.assignaddr.ofs_to_arrayparam(
-            self.arrayparam_y.objtype[2])
+            self.arrayparam_y.var.objtype[2])
         currentofs = self.assignaddr.ofsman.current_offset
 
         nose.tools.eq_(expected_x, self.arrayparam_x.offset)
@@ -184,7 +184,7 @@ class AssignAddrTest(TestCase):
 
         self.paramdecl_x.offset = self.assignaddr.ofs_to_param()
         self.arrayparam_x.offset = self.assignaddr.ofs_to_arrayparam(
-            self.arrayparam_x.objtype[2])
+            self.arrayparam_x.var.objtype[2])
         currentofs = self.assignaddr.ofsman.current_offset
 
         nose.tools.eq_(expected_x, self.paramdecl_x.offset)
@@ -195,7 +195,8 @@ class AssignAddrTest(TestCase):
         """配列型グローバル変数ax[5]に対するアドレス割り当てテスト"""
         expected_x = -20
 
-        self.globalarray_x.offset = self.assignaddr.ofs_to_globalarray()
+        self.globalarray_x.offset = self.assignaddr.ofs_to_globalarray(
+            self.globalarray_x.var.objtype[2])
         currentofs = self.assignaddr.ofsman.current_offset
 
         nose.tools.eq_(expected_x, self.globalarray_x.offset)
@@ -206,7 +207,7 @@ class AssignAddrTest(TestCase):
         expected_x = -20
         expected_y = -24
 
-        self.globalarray_x.offset = self.assignaddr.ofs_to_globalarray()
+        self.globalarray_x.offset = self.assignaddr.ofs_to_globalarray(self.globalarray_x.var.objtype[2])
         self.globaldecl_y.offset = self.assignaddr.ofs_to_globalvar()
         currentofs = self.assignaddr.ofsman.current_offset
 
@@ -219,8 +220,8 @@ class AssignAddrTest(TestCase):
         expected_ofsx = 4
         expected_ofsy = 8
 
-        expected_x = ic.VarDecl(sa.Decl("x", 1, "param", "int", expected_ofsx))
-        expected_y = ic.VarDecl(sa.Decl("x", 1, "param", "int", expected_ofsy))
+        expected_paramx = ic.VarDecl(sa.Decl("x", 1, "param", "int", expected_ofsx))
+        expected_paramy = ic.VarDecl(sa.Decl("y", 1, "param", "int", expected_ofsy))
 
         params = [self.paramdecl_x, self.paramdecl_y]
         intermed_f = sa.Decl("f", 0, "fun", ("fun", "void", "int", "int"))
@@ -232,7 +233,7 @@ class AssignAddrTest(TestCase):
         self.assignaddr.intermed_code = [fundef_f]
         result = self.assignaddr.assign_address()
 
-        nose.tools.eq_(result[0].params, [expected_x, expected_y])
+        nose.tools.ok_(result[0].params == [expected_paramx, expected_paramy])
 
     def test_compstmt2(self):
         """void f(int x, int y) {int x; int y; ...}に対するアドレス割り当てテスト"""
@@ -249,7 +250,7 @@ class AssignAddrTest(TestCase):
         expected_paramx = ic.VarDecl(
             sa.Decl("x", 1, "param", "int", expected_ofs_paramx))
         expected_paramy = ic.VarDecl(
-            sa.Decl("x", 1, "param", "int", expected_ofs_paramy))
+            sa.Decl("y", 1, "param", "int", expected_ofs_paramy))
 
         params = [self.paramdecl_x, self.paramdecl_y]
         intermed_f = sa.Decl("f", 0, "fun", ("fun", "void", "int", "int"))
@@ -260,10 +261,12 @@ class AssignAddrTest(TestCase):
 
         self.assignaddr.intermed_code = [fundef_f]
         result = self.assignaddr.assign_address()
+        for decl in result[0].body.decls:
+            print(decl.var.__dict__)
 
-        nose.tools.eq_(result[0].params, [expected_paramx, expected_paramy])
-        nose.tools.eq_(
-            result[0].body.decls, [expected_varx, expected_vary])
+        nose.tools.ok_(result[0].params == [expected_paramx, expected_paramy])
+        nose.tools.ok_(
+            result[0].body.decls == [expected_varx, expected_vary])
 
     def test_compstmt3(self):
         """int gx; int gy; void f(int x, int y) {int x; int y; ...}に対するアドレス割り当てテスト"""
@@ -287,7 +290,7 @@ class AssignAddrTest(TestCase):
         expected_paramx = ic.VarDecl(
             sa.Decl("x", 1, "param", "int", expected_ofs_paramx))
         expected_paramy = ic.VarDecl(
-            sa.Decl("x", 1, "param", "int", expected_ofs_paramy))
+            sa.Decl("y", 1, "param", "int", expected_ofs_paramy))
 
         params = [self.paramdecl_x, self.paramdecl_y]
         intermed_f = sa.Decl("f", 0, "fun", ("fun", "void", "int", "int"))
@@ -300,8 +303,11 @@ class AssignAddrTest(TestCase):
         self.assignaddr.intermed_code = exterenal_dec
         result = self.assignaddr.assign_address()
 
-        nose.tools.eq_(result[0], expected_globalx)
-        nose.tools.eq_(result[1], expected_globaly)
-        nose.tools.eq_(result[2].params, [expected_paramx, expected_paramy])
-        nose.tools.eq_(
-            result[2].body.decls, [expected_varx, expected_vary])
+        nose.tools.ok_(result[0] ==  expected_globalx)
+        nose.tools.ok_(result[1] == expected_globaly)
+        nose.tools.ok_(result[2].params == [expected_paramx, expected_paramy])
+        nose.tools.ok_(
+            result[2].body.decls == [expected_varx, expected_vary])
+
+if __name__ == '__main__':
+    nose.main(argv=['nose', '-v'])
