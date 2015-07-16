@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+from __future__ import unicode_literals
 import semantic_analyzer as sa
 import intermed_code as ic
 
@@ -17,6 +18,7 @@ class AssignAddress(object):
            宣言を見つけ出して種類に応じたアドレス割り当て関数に送る
            全ての宣言にアドレスを割り当てた後、書き換えた中間表現を返す"""
         for i, itmdelem in enumerate(self.intermed_code):
+            # グローバル宣言
             if isinstance(itmdelem, ic.VarDecl):
                 if isinstance(itmdelem.var.objtype, tuple) and \
                     itmdelem.var.objtype[0] == "array":
@@ -24,9 +26,10 @@ class AssignAddress(object):
                 else:
                     self.intermed_code[i].var.offset = self.ofs_to_globalvar()
 
+            # 関数定義
             elif isinstance(itmdelem, ic.FunctionDefinition):
                 self.ofsman.reset()
-
+                # パラメータ
                 for j, param in enumerate(itmdelem.params):
                     if isinstance(param.var.objtype, tuple) and \
                         param.var.objtype[0] == "array":
@@ -36,12 +39,17 @@ class AssignAddress(object):
 
                 self.ofsman.reset()
 
+                # 関数内での宣言
                 for k, decl in enumerate(itmdelem.body.decls):
-                    if isinstance(itmdelem.var.objtype, tuple) and \
+                    if isinstance(decl.var.objtype, tuple) and \
                         itmdelem.var.objtype[0] == "array":
                         self.intermed_code[i].body.decls[k].var.offset = self.ofs_to_arrayvar()
                     else:
                         self.intermed_code[i].body.decls[k].var.offset = self.ofs_to_var()
+
+                # self.ofsman.reset()
+
+                # 関数内の複文に含まれる宣言
 
                 self.ofsman.reset()
 
