@@ -12,6 +12,8 @@ import ast
 import restorecode
 import parsertest
 import semantic_analyzer
+import intermed_code
+import assign_address
 
 
 class Parser(object):
@@ -206,7 +208,7 @@ class Parser(object):
 
     def p_compound_statement_declaration(self, p):
         '''compound-statement : LBRACE declaration-list RBRACE'''
-        p[0] = ast.CompoundStatement(ast.DeclaratorList(p[2]), ast.StatementList(ast.NullNode()))
+        p[0] = ast.CompoundStatement(ast.DeclarationList(p[2]), ast.StatementList(ast.NullNode()))
 
     def p_compound_statement_statement(self, p):
         '''compound-statement : LBRACE statement-list RBRACE'''
@@ -214,7 +216,7 @@ class Parser(object):
 
     def p_compound_statement_declaration_statement(self, p):
         '''compound-statement : LBRACE declaration-list statement-list RBRACE'''
-        p[0] = ast.CompoundStatement(ast.DeclaratorList(p[2]), ast.StatementList(p[3]))
+        p[0] = ast.CompoundStatement(ast.DeclarationList(p[2]), ast.StatementList(p[3]))
 
 
     # declaration list
@@ -342,7 +344,7 @@ class Parser(object):
 
     def p_mult_expr_divide(self, p):
         '''mult-expr : mult-expr DIVIDE unary-expr'''
-        p[0] = ast.BinaryOperators("DIV", p[1], p[3])
+        p[0] = ast.BinaryOperators("DIVIDE", p[1], p[3])
 
 
     # unary expression
@@ -459,7 +461,7 @@ class Parser(object):
             print("choose test.")
             # select = raw_input()
             # selecting testcode6 for testing semantic analyzer
-            select = "7"
+            select = "3"
             if select == "1":
                 # testcode1をパース、復元
                 print("Parse and restore code1.")
@@ -553,9 +555,17 @@ class Parser(object):
 
             analyzer = semantic_analyzer.Analyzer(result)
             env = analyzer.analyze(analyzer.nodelist)
-            e_msg, w_msg, e_cnt, w_cnt = analyzer.check_type(analyzer.nodelist, env)
-            error_mng = semantic_analyzer.ErrorManager(e_msg, w_msg, e_cnt, w_cnt)
+            e_cnt, w_cnt = analyzer.check_type(analyzer.nodelist, env)
+            ast_top = analyzer.nodelist
+
+            error_mng = semantic_analyzer.ErrorManager(e_cnt, w_cnt)
             error_mng.print_error()
+
+            icg = intermed_code.IntermedCodeGenerator(ast_top)
+            intermed_code_list = icg.intermed_code_generator()
+
+            a_addr = assign_address.AssignAddress(intermed_code_list)
+            addressed = a_addr.assign_address()
 
 myparser = Parser()
 myparser.build()
