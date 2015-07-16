@@ -11,11 +11,15 @@ import logging
 
 class Decl(object):
 
-    def __init__(self, name, level, kind, objtype):
+    def __init__(self, name, level, kind, objtype, offset=0):
         self.name = name
         self.level = level
         self.kind = kind
         self.objtype = objtype
+        self.offset = offset
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
 
 
 class Environment(Decl):
@@ -44,8 +48,8 @@ class Analyzer(object):
         self.nodelist = ast_top
         self.env = Environment()
         # self.last = False
-        self.error_msg = ""
-        self.warning_msg = ""
+        # self.error_msg = ""
+        # self.warning_msg = ""
         self.error_count = 0
         self.warning_count = 0
 
@@ -83,7 +87,8 @@ class Analyzer(object):
 
     def analyze_func_prototype(self, proto_node, level):
         if level != 0:
-            logging.error("Prototype function declaration is available only at top-level.")
+            logging.error(
+                "Prototype function declaration is available only at top-level.")
             self.error_count += 1
         else:
             # 抽象構文木をたどって関数名を取ってくる
@@ -107,7 +112,8 @@ class Analyzer(object):
 
     def analyze_func_definition(self, funcdef_node, level):
         if level != 0:
-            logging.error("Function definition is available only at top-level.")
+            logging.error(
+                "Function definition is available only at top-level.")
             error_count += 1
         else:
             # 抽象構文木をたどって関数名を取ってくる
@@ -203,8 +209,21 @@ class Analyzer(object):
                     else:
                         self.env.add(decl_proto)
 
-            self.analyze(
-                nodelist.function_declarator.parameter_type_list, level+1)
+            # self.analyze(
+                # nodelist.function_declarator.parameter_type_list, level+1)
+
+            param_list = []
+
+            for paramdec in nodelist.function_declarator.parameter_type_list.nodes:
+                decl_param = self.analyze_param_declaration(paramdec, level)
+
+                # 重複チェック
+                for existing_param in param_list:
+                    if decl_param.name == existing_param.name:
+                        logging.error("This parameter declaration in function prototype declaration is duplicated - param {0}".format(
+                            decl_param.name))
+                        self.error_count += 1
+                param_list.append(decl_param)
 
         elif isinstance(nodelist, ast.FunctionDefinition):
             decl_funcdef = self.analyze_func_definition(nodelist, level)
@@ -235,7 +254,7 @@ class Analyzer(object):
             try:
                 func_index = self.env.decl_list.index(decl_funcdef)
                 self.analyze(
-                nodelist.function_declarator.parameter_type_list, level+1, func_index)
+                    nodelist.function_declarator.parameter_type_list, level+1, func_index)
                 self.analyze(nodelist.compound_statement, level+2, func_index)
             except ValueError:
                 pass
@@ -258,6 +277,9 @@ class Analyzer(object):
             for param in param_list:
                 self.env.add(param)
 
+            for paramdec in nodelist.nodes:
+                self.analyze(paramdec.parameter_declarator.identifier, level)
+
         elif isinstance(nodelist, ast.CompoundStatement):
             for declaration in nodelist.declaration_list.nodes:
                 self.analyze(declaration, level, scope_index)
@@ -277,6 +299,7 @@ class Analyzer(object):
             self.analyze(nodelist.expression)
 
         elif isinstance(nodelist, ast.FunctionExpression):
+            # 関数名解析
             if self.env.lookup(nodelist.identifier.identifier) is None:
                 logging.error("Referencing undeclared function {0} at line {1}.".format(
                     nodelist.identifier.identifier, nodelist.lineno))
@@ -290,6 +313,13 @@ class Analyzer(object):
                     logging.error("Referencing variable {0} as a function at line {1}.".format(
                         nodelist.identifier.identifier, nodelist.lineno))
                     self.error_count += 1
+
+            # パラメータ解析
+            self.analyze(nodelist.argument_expression)
+
+        elif isinstance(nodelist, ast.ArgumentExpressionList):
+            for argnode in nodelist.nodes:
+                self.analyze(argnode, level)
 
         elif isinstance(nodelist, ast.BinaryOperators):
             self.analyze(nodelist.left, level)
@@ -431,14 +461,16 @@ class Analyzer(object):
 
         elif isinstance(nodelist, ast.IfStatement):
             if not self.check_type(nodelist.expression, env) == "int":
-                logging.error("Expression of if statement must return int-type.")
+                logging.error(
+                    "Expression of if statement must return int-type.")
                 self.error_count += 1
             self.check_type(nodelist.then_statement, env)
             self.check_type(nodelist.else_statement, env)
 
         elif isinstance(nodelist, ast.WhileLoop):
-            if not self.check_type(nodelist.expression) == "int":
-                logging.error("Expression of while statement must return int-type.")
+            if not self.check_type(nodelist.expression, env) == "int":
+                logging.error(
+                    "Expression of while statement must return int-type.")
                 self.error_count += 1
             self.check_type(nodelist.statement, env)
 
@@ -451,7 +483,8 @@ class Analyzer(object):
                 if self.check_type(nodelist.left, env) == self.check_type(nodelist.right, env):
                     return self.check_type(nodelist.left, env)
                 else:
-                    logging.error("Type inconsintency between left-hand {0} and right-hand {1} of assign expression.".format(nodelist.left, nodelist.right))
+                    logging.error(
+                        "Type inconsintency between left-hand {0} and right-hand {1} of assign expression.".format(nodelist.left, nodelist.right))
                     self.error_count += 1
 
             elif nodelist.op == "AND" or nodelist.op == "OR":
@@ -470,7 +503,8 @@ class Analyzer(object):
                 if self.check_type(nodelist.left, env) == self.check_type(nodelist.right, env):
                     return "int"
                 else:
-                    logging.error("Type inconsintency between left-hand and right-hand of assign expression.")
+                    logging.error(
+                        "Type inconsintency between left-hand and right-hand of assign expression.")
                     self.error_count += 1
 
             elif nodelist.op == "PLUS" \
@@ -482,7 +516,8 @@ class Analyzer(object):
                         or self.check_type(nodelist.left, env) == ("pointer", "int") and self.check_type(nodelist.right, env) == "int":
                     return ("pointer", "int")
                 else:
-                    logging.error("Type inconsintency of calculation operands.")
+                    logging.error(
+                        "Type inconsintency of calculation operands.")
                     self.error_count += 1
 
             elif nodelist.op == "MINUS":
@@ -491,14 +526,16 @@ class Analyzer(object):
                 elif self.check_type(nodelist.left, env) == ("pointer", "int") and self.check_type(nodelist.right, env) == "int":
                     return ("pointer", "int")
                 else:
-                    logging.error("Type inconsintency of calculation operands.")
+                    logging.error(
+                        "Type inconsintency of calculation operands.")
                     self.error_count += 1
 
         elif isinstance(nodelist, ast.Address):
             if self.check_type(nodelist.expression, env) == "int":
                 return ("pointer", "int")
             else:
-                logging.error("Invalid type for operand of pointer expression.")
+                logging.error(
+                    "Invalid type for operand of pointer expression.")
                 self.error_count += 1
 
         elif isinstance(nodelist, ast.Pointer):
@@ -554,14 +591,14 @@ class Analyzer(object):
         elif isinstance(nodelist, ast.Number):
             return "int"
 
-        return self.error_msg, self.warning_msg, self.error_count, self.warning_count
+        return self.error_count, self.warning_count
 
 
 class ErrorManager(object):
 
-    def __init__(self, e_msg, w_msg, e_cnt, w_cnt):
-        self.error_msg = e_msg
-        self.warning_msg = w_msg
+    def __init__(self, e_cnt, w_cnt):
+        # self.error_msg = e_msg
+        # self.warning_msg = w_msg
         self.error_count = e_cnt
         self.warning_count = w_cnt
 
@@ -569,8 +606,8 @@ class ErrorManager(object):
         print("{0} Errors and {1} Warnings.".format(
             self.error_count, self.warning_count))
 
-        if not self.warning_msg == "":
-            sys.stderr.write(self.warning_msg)
+        # if not self.warning_msg == "":
+        #     sys.stderr.write(self.warning_msg)
 
-        if not self.error_msg == "":
-            sys.exit(self.error_msg)
+        # if not self.error_msg == "":
+        #     sys.exit(self.error_msg)
