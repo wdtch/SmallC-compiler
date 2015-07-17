@@ -3,7 +3,7 @@
 
 """構文解析モジュール"""
 
-from __future__ import unicode_literals, print_function
+# from __future__ import unicode_literals, print_function
 import ply.lex as lex
 import ply.yacc as yacc
 import tokenrules
@@ -14,6 +14,8 @@ import parsertest
 import semantic_analyzer
 import intermed_code
 import assign_address
+import codegen
+import printcode
 
 
 class Parser(object):
@@ -204,19 +206,22 @@ class Parser(object):
     # compound statement
     def p_compound_statement_empty(self, p):
         '''compound-statement : LBRACE RBRACE'''
-        p[0] = ast.CompoundStatement(ast.NullNode(), ast.NullNode())
+        p[0] = ast.CompoundStatement(ast.DeclarationList(ast.NullNode()), ast.StatementList(ast.NullNode()))
 
     def p_compound_statement_declaration(self, p):
         '''compound-statement : LBRACE declaration-list RBRACE'''
-        p[0] = ast.CompoundStatement(ast.DeclarationList(p[2]), ast.StatementList(ast.NullNode()))
+        # p[0] = ast.CompoundStatement(ast.DeclarationList(p[2]), ast.StatementList(ast.NullNode()))
+        p[0] = ast.CompoundStatement(p[2], ast.StatementList(ast.NullNode()))
 
     def p_compound_statement_statement(self, p):
         '''compound-statement : LBRACE statement-list RBRACE'''
-        p[0] = ast.CompoundStatement(ast.DeclarationList(ast.NullNode()), ast.StatementList(p[2]))
+        # p[0] = ast.CompoundStatement(ast.DeclarationList(ast.NullNode()), ast.StatementList(p[2]))
+        p[0] = ast.CompoundStatement(ast.DeclarationList(ast.NullNode()), p[2])
 
     def p_compound_statement_declaration_statement(self, p):
         '''compound-statement : LBRACE declaration-list statement-list RBRACE'''
-        p[0] = ast.CompoundStatement(ast.DeclarationList(p[2]), ast.StatementList(p[3]))
+        # p[0] = ast.CompoundStatement(ast.DeclarationList(p[2]), ast.StatementList(p[3]))
+        p[0] = ast.CompoundStatement(p[2], p[3])
 
 
     # declaration list
@@ -233,6 +238,10 @@ class Parser(object):
     # statement list
     def p_statement_list(self, p):
         '''statement-list : statement'''
+        # if isinstance(p[1], ast.StatementList):
+        #     p[0].append(p[1])
+        # else:
+        #     p[0] = ast.StatementList(p[1])
         p[0] = ast.StatementList(p[1])
 
     def p_statement_list_statement_list(self, p):
@@ -461,7 +470,7 @@ class Parser(object):
             print("choose test.")
             # select = raw_input()
             # selecting testcode6 for testing semantic analyzer
-            select = "3"
+            select = "8"
             if select == "1":
                 # testcode1をパース、復元
                 print("Parse and restore code1.")
@@ -553,6 +562,31 @@ class Parser(object):
                 restorecode.restore_code(result)
                 print("")
 
+            elif select == "8":
+                # testcode6をパース、復元→意味解析へ
+                print("Parse and restore code8.")
+                try:
+                    s = parsertest.testcode8
+                except EOFError:
+                    print("EOF Error!(;_;)")
+                # パース
+                result = self.parser.parse(s)
+                # コード復元部
+                restorecode.restore_code(result)
+                print("")
+
+            print(result)
+            for node in result.nodes:
+                print(node)
+            # print(result.nodes[0].type_specifier.__dict__)
+            # print(result.nodes[0].function_declarator.__dict__)
+            # print(result.nodes[0].compound_statement.__dict__)
+            # for decl in result.nodes[0].compound_statement.declaration_list.nodes:
+            #     print(decl)
+            # for stmt in result.nodes[0].compound_statement.statement_list.nodes:
+            #     print(stmt)
+
+
             analyzer = semantic_analyzer.Analyzer(result)
             env = analyzer.analyze(analyzer.nodelist)
             e_cnt, w_cnt = analyzer.check_type(analyzer.nodelist, env)
@@ -566,6 +600,21 @@ class Parser(object):
 
             a_addr = assign_address.AssignAddress(intermed_code_list)
             addressed = a_addr.assign_address()
+
+            # print(addressed)
+            # print(addressed[0].__dict__)
+            # print(addressed[0].body.decls)
+            # print(addressed[0].body.stmts)
+
+            code_generator = codegen.CodeGenerator(addressed)
+            assembly = code_generator.intermed_code_to_code()
+            print(assembly)
+            for ass in assembly:
+                print(ass.__dict__)
+
+            printer = printcode.PrintCode(assembly)
+            strcode = printer.code_to_string()
+            print(strcode)
 
 myparser = Parser()
 myparser.build()
