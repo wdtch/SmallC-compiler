@@ -387,6 +387,7 @@ class IntermedCodeGenerator(object):
                     itmd_stmtlist.append(let_left)
                     itmd_stmtlist.append(let_right)
                     itmd_stmtlist.append(ReadStatement(p1, p2))
+
                 else:
                     x = statement.left.identifier
                     e = statement.right
@@ -478,7 +479,7 @@ class IntermedCodeGenerator(object):
            引数として変換する関数定義のノードをとる
            返り値として変換結果の中間命令列のリストを返す"""
         itmd_paramlist = []
-        funcvar = fundef.function_declarator.identifier
+        funcvar = fundef.function_declarator.identifier.identifier
 
         if not isinstance(fundef.function_declarator.parameter_type_list, ast.NullNode):
             for param in fundef.function_declarator.parameter_type_list.nodes:
