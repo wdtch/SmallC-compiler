@@ -3,7 +3,6 @@
 
 """意味解析モジュール"""
 
-from __future__ import unicode_literals
 import sys
 import ast
 import logging
@@ -227,6 +226,8 @@ class Analyzer(object):
 
         elif isinstance(nodelist, ast.FunctionDefinition):
             decl_funcdef = self.analyze_func_definition(nodelist, level)
+            nodelist.function_declarator.identifier.identifier = decl_funcdef
+
             if self.env.lookup(decl_funcdef.name) is None:
                 self.env.add(decl_funcdef)
             else:
@@ -419,22 +420,22 @@ class Analyzer(object):
         elif isinstance(nodelist, ast.FunctionDefinition):
             # 返り値の型の整合性チェック
             return_exists = False
-            for stmtlist in nodelist.compound_statement.statement_list.nodes:
-                for stmt_node in stmtlist.nodes:
-                    # return文を探す
-                    if isinstance(stmt_node, ast.ReturnStatement):
-                        return_exists = True
-                        # void
-                        if isinstance(stmt_node.return_statement, ast.NullNode):
-                            if nodelist.type_specifier.type_specifier == "int":
-                                logging.error("Void-type return but int-type function definition {0} at line {1}.".format(
-                                    nodelist.function_declarator.identifier.identifier, nodelist.function_declarator.identifier.lineno))
-                                self.error_count += 1
-                        else:
-                            if nodelist.type_specifier.type_specifier == "void":
-                                logging.error("Int-type return but void-type function definition {0} at line {1}.".format(
-                                    nodelist.function_declarator.identifier.identifier, nodelist.function_declarator.identifier.lineno))
-                                self.error_count += 1
+            for stmt_node in nodelist.compound_statement.statement_list.nodes:
+                # for stmt_node in stmtlist.nodes:
+                # return文を探す
+                if isinstance(stmt_node, ast.ReturnStatement):
+                    return_exists = True
+                    # void
+                    if isinstance(stmt_node.return_statement, ast.NullNode):
+                        if nodelist.type_specifier.type_specifier == "int":
+                            logging.error("Void-type return but int-type function definition {0} at line {1}.".format(
+                                nodelist.function_declarator.identifier.identifier, nodelist.function_declarator.identifier.lineno))
+                            self.error_count += 1
+                    else:
+                        if nodelist.type_specifier.type_specifier == "void":
+                            logging.error("Int-type return but void-type function definition {0} at line {1}.".format(
+                                nodelist.function_declarator.identifier.identifier, nodelist.function_declarator.identifier.lineno))
+                            self.error_count += 1
             if not return_exists:  # return文がなかったとき
                 if nodelist.type_specifier.type_specifier == "int":
                     logging.error("Void-type return but int-type function definition {0} at line {1}.".format(
@@ -556,27 +557,27 @@ class Analyzer(object):
                 arglen = 0
             else:
                 arglen = len(nodelist.argument_expression.nodes)
-            if arglen > len(func_decl.objtype[2:]):
-                logging.error("Too many arguments for function {0}.".format(
-                    func_decl.name))
-                self.error_count += 1
-            elif arglen < len(func_decl.objtype[2:]):
-                logging.error("Too few arguments for function {0}.".format(
-                    func_decl.name))
-                self.error_count += 1
-            else:  # 引数の個数が一致したとき
-                # 引数の型チェック
-                if arglen == 0:
-                    return func_decl.objtype[1]
-                else:
-                    for i, argnode in enumerate(nodelist.argument_expression.nodes):
-                        if not self.check_type(argnode, env) == func_decl.objtype[2+i]:
-                            ill_type = self.check_type(argnode, env)
-                            logging.error("Taking {0} type argument for function {1}: correct type is {2}.".format(
-                                ill_type, func_decl.name. func_decl.objtype[2+i]))
-                            self.error_count += 1
-                    else:
+                if arglen > len(func_decl.objtype[2:]):
+                    logging.error("Too many arguments for function {0}.".format(
+                        func_decl.name))
+                    self.error_count += 1
+                elif arglen < len(func_decl.objtype[2:]):
+                    logging.error("Too few arguments for function {0}.".format(
+                        func_decl.name))
+                    self.error_count += 1
+                else:  # 引数の個数が一致したとき
+                    # 引数の型チェック
+                    if arglen == 0:
                         return func_decl.objtype[1]
+                    else:
+                        for i, argnode in enumerate(nodelist.argument_expression.nodes):
+                            if not self.check_type(argnode, env) == func_decl.objtype[2+i]:
+                                ill_type = self.check_type(argnode, env)
+                                logging.error("Taking {0} type argument for function {1}: correct type is {2}.".format(
+                                    ill_type, func_decl.name. func_decl.objtype[2+i]))
+                                self.error_count += 1
+                        else:
+                            return func_decl.objtype[1]
 
         elif isinstance(nodelist, ast.Identifier):
             if isinstance(nodelist.identifier, Decl):
