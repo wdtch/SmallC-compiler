@@ -1,7 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from __future__ import unicode_literals
 import semantic_analyzer as sa
 import intermed_code as ic
 
@@ -42,7 +41,7 @@ class AssignAddress(object):
                 # 関数内での宣言
                 for k, decl in enumerate(itmdelem.body.decls):
                     if isinstance(decl.var.objtype, tuple) and \
-                        itmdelem.var.objtype[0] == "array":
+                        decl.var.objtype[0] == "array":
                         self.intermed_code[i].body.decls[k].var.offset = self.ofs_to_arrayvar()
                     else:
                         self.intermed_code[i].body.decls[k].var.offset = self.ofs_to_var()
@@ -50,6 +49,9 @@ class AssignAddress(object):
                 # self.ofsman.reset()
 
                 # 関数内の複文に含まれる宣言
+                # for stmt in itmdelem.body.stmts:
+                #     self.assign_address_to_stmt(stmt)
+                # self.assign_ofs_to_compstmt(itmdelem.body)
 
                 self.ofsman.reset()
 
@@ -58,26 +60,26 @@ class AssignAddress(object):
     def ofs_to_var(self):
         """局所変数に割り当てるアドレスを計算し、その値を返す"""
         self.ofsman.next_ofs_var()
-        offset_var = self.ofsman.current_offset
+        offset_var = self.ofsman.current_varoffset
         return offset_var
 
     def ofs_to_param(self):
         """パラメータに割り当てるアドレスを計算し、その値を返す"""
         self.ofsman.next_ofs_param()
-        offset_param = self.ofsman.current_offset
+        offset_param = self.ofsman.current_paramoffset
         return offset_param
 
     def ofs_to_globalvar(self):
         """グローバル変数に割り当てるアドレスを計算し、その値を返す"""
         self.ofsman.next_ofs_var()
-        offset_globalvar = self.ofsman.current_offset
+        offset_globalvar = self.ofsman.current_varoffset
         return offset_globalvar
 
     def ofs_to_arrayvar(self, size):
         """配列型の局所変数に割り当てるアドレスを計算し、その値を返す"""
         for _ in range(size):
             self.ofsman.next_ofs_var()
-        offset_array = self.ofsman.current_offset
+        offset_array = self.ofsman.current_varoffset
 
         return offset_array
 
@@ -85,7 +87,7 @@ class AssignAddress(object):
         """配列型のパラメータに割り当てるアドレスを計算し、その値を返す"""
         for _ in range(size):
             self.ofsman.next_ofs_param()
-        offset_paramarray = self.ofsman.current_offset
+        offset_paramarray = self.ofsman.current_paramoffset
 
         return offset_paramarray
 
@@ -93,24 +95,73 @@ class AssignAddress(object):
         """配列型のグローバル変数に割り当てるアドレスを計算し、その値を返す"""
         for _ in range(size):
             self.ofsman.next_ofs_var()
-        offset_globalarray = self.ofsman.current_offset
+        offset_globalarray = self.ofsman.current_varoffset
 
         return offset_globalarray
+
+    # def assign_ofs_to_compstmt(self, compstmt):
+    #     """関数定義内の複文、またはその複文に含まれる複文(if, while文の中)から
+    #        宣言を見つけてアドレスを割り当てる"""
+    #     if isinstance(stmt, ic.IfStatement):
+    #         for then_decl in stmt.then_stmt.decls:
+    #             if isinstance(then_decl.var.objtype, tuple) and \
+    #                 then_decl.var.objtype[0] == "array":
+    #                 then_decl.var.offset = self.ofs_to_arrayvar()
+    #             else:
+    #                 then_decl.var.offset = self.ofs_to_var()
+
+    #         for then_stmtelem in stmt.then_stmt.stmts:
+    #             self.assign_address_to_stmt(then_stmtelem)
+
+    #         for else_decl in stmt.else_stmt.decls:
+    #             if isinstance(else_decl.var.objtype, tuple) and \
+    #                 else_decl.var.objtype[0] == "array":
+    #                 else_decl.var.offset = self.ofs_to_arrayvar()
+    #             else:
+    #                 else_decl.var.offset = self.ofs_to_var()
+
+    #         for else_stmtelem in stmt.else_stmt.stmts:
+    #             self.assign_address_to_stmt(self, else_stmtelem)
+
+    #     elif isinstance(stmt, ic.WhileStatement):
+    #         for while_decl in stmt.stmt.decls:
+    #             if isinstance(while_decl.var.objtype, tuple) and \
+    #                 while_decl.var.objtype[0] == "array":
+    #                 while_decl.var.offset = self.ofs_to_arrayvar()
+    #             else:
+    #                 while_decl.var.offset = self.ofs_to_var()
+
+    #         for while_stmt in stmt.stmt.stmts:
+    #             self.assign_address_to_stmt(while_stmt)
+
+    #     for decl in compstmt.decls:
+    #         if isinstance(decl.var.objtype, tuple) and \
+    #             decl.var.objtype[0] == "array":
+    #             decl.var.offset = self.ofs_to_arrayvar()
+    #         else:
+    #             decl.var.offset = self.ofs_to_var()
+
+    #     for stmt in compstmt.stmts:
+    #         if
+
 
 class OffsetManager(object):
 
     def __init__(self, wordsize):
-        self.init_offset = 0
-        self.current_offset = self.init_offset
+        self.init_varoffset = 4
+        self.init_paramoffset = 0
+        self.current_varoffset = self.init_varoffset
+        self.current_paramoffset = self.init_paramoffset
         self.wordsize = wordsize
 
     def next_ofs_var(self):
         """局所変数に割り当てるオフセットをwordsizeの分だけ下にずらす"""
-        self.current_offset = self.current_offset - self.wordsize
+        self.current_varoffset = self.current_varoffset - self.wordsize
 
     def next_ofs_param(self):
         """パラメータに割り当てるオフセットをwordsizeの分だけ上にずらす"""
-        self.current_offset = self.current_offset + self.wordsize
+        self.current_paramoffset = self.current_paramoffset + self.wordsize
 
     def reset(self):
-        self.current_offset = self.init_offset
+        self.current_varoffset = self.init_varoffset
+        self.current_paramoffset = self.init_paramoffset
