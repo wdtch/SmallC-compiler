@@ -422,19 +422,21 @@ class IntermedCodeGenerator(object):
             itmd_stmtlist.append(let_exp)
             itmd_stmtlist.append(intermed_while)
 
+        elif isinstance(statement, ast.ExpressionStatement):
+            itmd_stmtlist.append(self.intermed_code_statement(statement.expression))
+
         elif isinstance(statement, ast.FunctionExpression):
             # print関数の呼び出し
             if statement.identifier.name == "print":
-                # print関数の引数は必ず1つ
                 p1 = self.tvg.newvardecl()
-                let_arg = self.intermed_code_exp(p1, statement.argument_expression[0])
+                let_arg = [self.intermed_code_exp(p1, arg) for arg in statement.argument_expression.nodes] # 引数は1つと仮定してもいいのかも
                 intermed_print = PrintStatement(p1)
                 itmd_stmtlist.append(let_arg)
                 itmd_stmtlist.append(intermed_print)
             # それ以外の関数呼び出し
             else:
-                tempvars = [self.tvg.newvardecl() for _ in statement.argument_expression]
-                let_args = [self.intermed_code_exp(tempvars[i], arg) for i, arg in enumerate(statement.argument_expression)]
+                tempvars = [self.tvg.newvardecl() for _ in statement.argument_expression.nodes]
+                let_args = [self.intermed_code_exp(tempvars[i], arg) for i, arg in enumerate(statement.argument_expression.nodes)]
                 intermed_funccall = CallStatement(None, statement.identifier, tempvars)
                 for let_arg in reversed(let_args):
                     itmd_stmtlist.append(let_arg)
@@ -451,28 +453,35 @@ class IntermedCodeGenerator(object):
                 itmd_stmtlist.append(intermed_return)
 
         elif isinstance(statement, ast.CompoundStatement):
-            decl_list = []
-            stmt_list = []
-
-            for decl in statement.declaration_list.nodes:
-                decls = self.intermed_code_vardecl(decl)
-                for intermed_decl in decls:
-                    decl_list.append(intermed_decl)
-
-            for statement in statement.statement_list.nodes:
-                stmt_list.append(self.intermed_code_statement(statement))
-
-            for stmtelem in flatten(stmt_list):
-                if isinstance(stmtelem, LetStatement):
-                    if isinstance(stmtelem.var, sa.Decl) \
-                            and stmtelem.var.kind == "temp":
-                        decl_list.append(
-                            VarDecl(stmtelem.var))
-
-            itmd_compstmt = CompoundStatement(flatten(decl_list), flatten(stmt_list))
-            itmd_stmtlist.append(itmd_compstmt)
+            intermed_compstmt = self.intermed_code_compstmt(statement)
+            itmd_stmtlist.append(intermed_compstmt)
 
         return flatten(itmd_stmtlist)
+
+    def intermed_code_compstmt(self, compstmt):
+        """CompoundStatementを表す抽象構文木のノードを中間命令列に変換する
+           引数として変換対象の複文のノードを取り、返り値として生成された一時変数の
+           宣言を加えた中間命令を返す"""
+        decl_list = []
+        stmt_list = []
+        for decl in compstmt.declaration_list.nodes:
+            decls = self.intermed_code_vardecl(decl)
+            for intermed_decl in decls:
+                decl_list.append(intermed_decl)
+
+        for statement in compstmt.statement_list.nodes:
+            stmt_list.append(self.intermed_code_statement(statement))
+
+        for stmtelem in flatten(stmt_list):
+            if isinstance(stmtelem, LetStatement):
+                if isinstance(stmtelem.var, sa.Decl) \
+                        and stmtelem.var.kind == "temp":
+                    decl_list.append(
+                        VarDecl(stmtelem.var))
+
+        itmd_compstmt = CompoundStatement(flatten(decl_list), flatten(stmt_list))
+
+        return itmd_compstmt
 
     def intermed_code_fundef(self, fundef):
         """FunctionDefinitionを表す抽象構文木のノードを中間命令列に変換する
@@ -485,8 +494,8 @@ class IntermedCodeGenerator(object):
             for param in fundef.function_declarator.parameter_type_list.nodes:
                 itmd_paramlist.append(VarDecl(param.parameter_declarator.identifier.identifier))
 
-        itmd_compstmt = self.intermed_code_statement(fundef.compound_statement)
-        itmd_fundef = FunctionDefinition(funcvar, itmd_paramlist, itmd_compstmt[0])
+        itmd_compstmt = self.intermed_code_compstmt(fundef.compound_statement)
+        itmd_fundef = FunctionDefinition(funcvar, itmd_paramlist, itmd_compstmt)
 
         return itmd_fundef
 
