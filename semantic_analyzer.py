@@ -181,6 +181,7 @@ class Analyzer(object):
 
         elif isinstance(nodelist, ast.FunctionPrototype):
             decl_proto = self.analyze_func_prototype(nodelist, level)
+            nodelist.function_declarator.identifier.identifier = decl_proto
             if self.env.lookup(decl_proto.name) is None:
                 self.env.add(decl_proto)
             else:
@@ -309,6 +310,8 @@ class Analyzer(object):
                 existing_decl = self.env.lookup(
                     (nodelist.identifier.identifier))
                 if existing_decl.kind == "fun":
+                    nodelist.identifier = existing_decl
+                elif existing_decl.kind == "proto" and existing_decl.name == "print":
                     nodelist.identifier = existing_decl
                 elif existing_decl.kind == "var" or existing_decl.kind == "param":
                     logging.error("Referencing variable {0} as a function at line {1}.".format(
