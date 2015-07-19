@@ -26,7 +26,7 @@ class PrintCodeTest(TestCase):
 
     def test_label(self):
         """Label型のインスタンスを文字列に変換するテスト"""
-        expected = "main:\n"
+        expected = 1"main:\n"
 
         label = codegen.Label("main")
         actual = self.printer.struct_to_string(label)
@@ -35,7 +35,8 @@ class PrintCodeTest(TestCase):
 
     def test_code_to_string1(self):
         """アセンブリのリストを文字列に変換するテスト(Instructionのみ)"""
-        expected = "    li $t0,0\n" + \
+        expected = "    .data\n" + "nl: .asciiz \"\\n\"\n" + \
+                   "    li $t0,0\n" + \
                    "    li $t1,1\n"
 
         code = [codegen.Instruction("li", ("$t0", 0)),
@@ -47,7 +48,7 @@ class PrintCodeTest(TestCase):
 
     def test_code_to_string2(self):
         """アセンブリのリストを文字列に変換するテスト(Instructions, Label)"""
-        expected = "main:\n" + "    li $t0,0\n"
+        expected = "    .data\n" + "nl: .asciiz \"\\n\"\n" + "main:\n" + "    li $t0,0\n"
 
         code = [codegen.Label("main"),
                 codegen.Instruction("li", ("$t0", 0))]
