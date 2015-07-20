@@ -297,18 +297,10 @@ class IntermedCodeTest(TestCase):
 
         ast_x = ast.Identifier(self.decl_x, 1)
         ast_3 = ast.Number(3)
-        ast_args_list = [ast_x, ast_3]
+        ast_args_list = ast.ArgumentExpressionList(ast_x)
+        ast_args_list.append(ast_3)
         callexp_f = ast.FunctionExpression(decl_f, ast_args_list, 1)
         actual = self.icg.intermed_code_statement(callexp_f)
-        print(actual)
-        print(actual[0].var.__dict__)
-        print(actual[0].exp.num)
-        print(actual[1].var.__dict__)
-        print(actual[1].exp.var.__dict__)
-        print(actual[2].dest)
-        print(actual[2].function.__dict__)
-        print(actual[2].variables[0].__dict__)
-        print(actual[2].variables[1].__dict__)
 
         nose.tools.ok_(expected == actual)
 
@@ -333,7 +325,7 @@ class IntermedCodeTest(TestCase):
         expected = [let_2, intermed_print]
 
         ast_2 = ast.Number(2)
-        args_list = [ast_2]
+        args_list = ast.ArgumentExpressionList(ast_2)
         decl_print = sa.Decl("print", 0, "fun", ("fun", "void", "int"))
         ast_print = ast.FunctionExpression(decl_print, args_list, 1)
         actual = self.icg.intermed_code_statement(ast_print)
@@ -496,7 +488,7 @@ class IntermedCodeTest(TestCase):
         paramdec = ast.ParameterDeclaration(typespcf, param_declarator)
         param_typelist = ast.ParameterTypeList(param_declaration)
 
-        func_declarator = ast.FunctionDeclarator("NORMAL", funcdecl, param_typelist)
+        func_declarator = ast.FunctionDeclarator("NORMAL", ast.Identifier(funcdecl, 10), param_typelist)
         fundef = ast.FunctionDefinition(typespcf, func_declarator, ast_compstmt)
 
         actual = self.icg.intermed_code_fundef(fundef)
