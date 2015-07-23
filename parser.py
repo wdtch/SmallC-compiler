@@ -19,6 +19,10 @@ import printcode
 
 
 class Parser(object):
+
+    def __init__(self, program=""):
+        self.program = program
+
     tokens = tokenrules.tokens
 
     # program
@@ -465,6 +469,8 @@ class Parser(object):
         # 構文解析
         self.parser = yacc.yacc(module=self, debug=debug)
 
+        # return self.parser.parse(self.program)
+
         # ここから単体テスト
         if __name__ == '__main__':
             print("choose test.")
@@ -566,7 +572,7 @@ class Parser(object):
                 # testcode6をパース、復元→意味解析へ
                 print("Parse and restore code8.")
                 try:
-                    s = parsertest.testcode8
+                    s = """void print(int i);""" + parsertest.testcode8
                 except EOFError:
                     print("EOF Error!(;_;)")
                 # パース
@@ -575,36 +581,159 @@ class Parser(object):
                 restorecode.restore_code(result)
                 print("")
 
-            print(result)
-            for node in result.nodes:
-                print(node)
-            # print(result.nodes[0].type_specifier.__dict__)
-            # print(result.nodes[0].function_declarator.__dict__)
-            # print(result.nodes[0].compound_statement.__dict__)
-            # for decl in result.nodes[0].compound_statement.declaration_list.nodes:
+            # print("------- parse result ------")
+            # for node in result.nodes:
+            #     print(node)
+            # print("::::: int fact :::::")
+            # print(result.nodes[1].type_specifier.__dict__)
+            # print(result.nodes[1].function_declarator.__dict__)
+            # print(result.nodes[1].compound_statement.__dict__)
+            # for decl in result.nodes[1].compound_statement.declaration_list.nodes:
             #     print(decl)
-            # for stmt in result.nodes[0].compound_statement.statement_list.nodes:
-            #     print(stmt)
+            # for stmt in result.nodes[1].compound_statement.statement_list.nodes:
+            #     print(stmt.__dict__)
+            #     if isinstance(stmt, ast.ExpressionStatement):
+            #         print(stmt.expression.__dict__)
+            #         print(stmt.expression.identifier.__dict__)
+            # print("::::: int main :::::")
+            # print(result.nodes[2].type_specifier.__dict__)
+            # print(result.nodes[2].function_declarator.__dict__)
+            # print(result.nodes[2].compound_statement.__dict__)
+            # for decl in result.nodes[2].compound_statement.declaration_list.nodes:
+            #     print(decl)
+            # for stmt in result.nodes[2].compound_statement.statement_list.nodes:
+            #     print(stmt.__dict__)
+            #     if isinstance(stmt, ast.ExpressionStatement):
+            #         print(stmt.expression.__dict__)
+            #         print(stmt.expression.identifier.__dict__)
 
 
             analyzer = semantic_analyzer.Analyzer(result)
             env = analyzer.analyze(analyzer.nodelist)
-            e_cnt, w_cnt = analyzer.check_type(analyzer.nodelist, env)
+            analyzer.check_type(analyzer.nodelist, env)
             ast_top = analyzer.nodelist
+            # print("------ Analyze Result ------")
+            # for node in ast_top.nodes:
+            #     print(node.__dict__)
+            # print("::::: int fact :::::")
+            # print(ast_top.nodes[1].compound_statement.__dict__)
+            # for stmt in ast_top.nodes[1].compound_statement.statement_list.nodes:
+            #     print(stmt.__dict__)
+            #     if isinstance(stmt, ast.ExpressionStatement):
+            #         print(stmt.expression.__dict__)
+            #         print(stmt.expression.identifier.__dict__)
+            #         for arg in stmt.expression.argument_expression.nodes:
+            #             print(arg.__dict__)
+            # print("::::: int main :::::")
+            # print(ast_top.nodes[2].compound_statement.__dict__)
+            # for stmt in ast_top.nodes[2].compound_statement.statement_list.nodes:
+            #     print(stmt.__dict__)
+            #     if isinstance(stmt, ast.ExpressionStatement):
+            #         print(stmt.expression.__dict__)
+            #         print(stmt.expression.identifier.__dict__)
+            #         for arg in stmt.expression.argument_expression.nodes:
+            #             print(arg.__dict__)
 
-            error_mng = semantic_analyzer.ErrorManager(e_cnt, w_cnt)
+            error_mng = semantic_analyzer.ErrorManager(analyzer.error_count, analyzer.warning_count)
             error_mng.print_error()
 
             icg = intermed_code.IntermedCodeGenerator(ast_top)
             intermed_code_list = icg.intermed_code_generator()
+            print(intermed_code_list)
+            # for code in intermed_code_list:
+            #     print(code.var.__dict__)
+            #     print(code.params)
+            #     print(code.body.decls)
+            #     print(code.body.stmts)
 
             a_addr = assign_address.AssignAddress(intermed_code_list)
             addressed = a_addr.assign_address()
 
+            # print("------- addressed -------")
             # print(addressed)
-            # print(addressed[0].__dict__)
+            # for elem in addressed:
+            #     print(elem.__dict__)
+            #     print(elem.var.__dict__)
+            # print(addressed[0].params)
+            # for param in addressed[0].params:
+            #     print(param.var)
+            #     print(param.var.__dict__)
             # print(addressed[0].body.decls)
             # print(addressed[0].body.stmts)
+            # print("--- decls ---")
+            # for decl in addressed[0].body.decls:
+            #     print(decl.var)
+            #     print(decl.var.__dict__)
+            # print("--- stmts ---")
+            # for i, stmt in enumerate(addressed[0].body.stmts):
+            #     print("{0}:".format(i))
+            #     if isinstance(stmt, intermed_code.LetStatement):
+            #         print(stmt)
+            #         print(stmt.var)
+            #         print(stmt.var.__dict__)
+            #         print(stmt.exp)
+            #         print(stmt.exp.__dict__)
+            #     elif isinstance(stmt, intermed_code.IfStatement):
+            #         print(stmt)
+            #         print(stmt.var)
+            #         print(stmt.var.__dict__)
+            #         print(stmt.then_stmt)
+            #         print(stmt.then_stmt.__dict__)
+            #         print("--- then statement ---")
+            #         print("decls:")
+            #         for declelem in stmt.then_stmt.decls:
+            #             print(declelem.var.__dict__)
+            #         print("statements:")
+            #         for stmtelem in stmt.then_stmt.stmts:
+            #             print(stmtelem)
+            #             print(stmtelem.__dict__)
+            #             print(stmtelem.var.__dict__)
+            #         print(stmt.else_stmt)
+            #         print(stmt.else_stmt.__dict__)
+            #         print("--- else statement ---")
+            #         print("decls:")
+            #         for declelem in stmt.else_stmt.decls:
+            #             print(declelem.var.__dict__)
+            #         print("statements:")
+            #         for stmtelem in stmt.else_stmt.stmts:
+            #             print(stmtelem)
+            #             print(stmtelem.__dict__)
+            #             if isinstance(stmtelem, intermed_code.LetStatement):
+            #                 print("var: {0}".format(stmtelem.var.__dict__))
+            #                 print("exp: {0}".format(stmtelem.exp.__dict__))
+            #                 if isinstance(stmtelem.exp, intermed_code.VarExpression):
+            #                     print(stmtelem.exp.var.__dict__)
+            #                 elif isinstance(stmtelem.exp, intermed_code.ArithmeticOperation):
+            #                     print(stmtelem.exp.var_left.__dict__)
+            #                     print(stmtelem.exp.var_right.__dict__)
+            #             elif isinstance(stmtelem, intermed_code.CallStatement):
+            #                 print("call statement...")
+            #                 print(stmtelem.dest.__dict__)
+            #                 print(stmtelem.function.__dict__)
+            #                 print(stmtelem.variables[0].__dict__)
+            # print("")
+            # print(addressed[0].body.stmts[0].__dict__)
+            # print(addressed[0].body.stmts[0].var.__dict__)
+            # print(addressed[0].body.stmts[0].exp.var.__dict__)
+            # print("")
+            # print(addressed[0].body.stmts[1].__dict__)
+            # print(addressed[0].body.stmts[1].var.__dict__)
+            # print(addressed[0].body.stmts[1].exp.__dict__)
+            # print("")
+            # print(addressed[0].body.stmts[2].__dict__)
+            # print(addressed[0].body.stmts[2].var.__dict__)
+            # print(addressed[0].body.stmts[2].exp.__dict__)
+            # print(addressed[0].body.stmts[2].exp.var_left.__dict__)
+            # print(addressed[0].body.stmts[2].exp.var_right.__dict__)
+            # print("")
+            # print(addressed[0].body.stmts[3].var.__dict__)
+            # print(addressed[0].body.stmts[3].__dict__)
+            # print(addressed[0].body.stmts[3].var.__dict__)
+            # print("")
+            # print(addressed[1].body.decls)
+            # print(addressed[1].body.stmts)
+            # for decl in addressed[1].body.decls:
+            #     print(decl.var.__dict__)
 
             code_generator = codegen.CodeGenerator(addressed)
             assembly = code_generator.intermed_code_to_code()
@@ -616,5 +745,9 @@ class Parser(object):
             strcode = printer.code_to_string()
             print(strcode)
 
-myparser = Parser()
-myparser.build()
+    def parse(self, data):
+        result = self.parser.parse(data)
+        return result
+
+# myparser = Parser()
+# myparser.build()
