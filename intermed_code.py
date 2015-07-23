@@ -3,6 +3,7 @@
 
 import ast
 import semantic_analyzer as sa
+# import assign_address
 import collections
 
 # リストを平らにする関数の定義
@@ -229,7 +230,10 @@ class IntermedCodeGenerator(object):
     def __init__(self, nodelist):
         self.ast_node = nodelist
         self.intermed_code_list = []
+        self.tempdecl_list = []
         self.tvg = TempVariableGenerator()
+        # self.addr = assign_address.AssignAddress()
+
 
     def intermed_code_generator(self):
         """抽象構文木を引数として受け取り(or インスタンス変数のast_nodeを更新し)、
@@ -248,6 +252,7 @@ class IntermedCodeGenerator(object):
         elif isinstance(self.ast_node, ast.FunctionDefinition):
             self.intermed_code_list.append(
                 self.intermed_code_fundef(self.ast_node))
+            self.tempdecl_list = [] # initialize
 
         return flatten(self.intermed_code_list)
 
@@ -290,6 +295,7 @@ class IntermedCodeGenerator(object):
 
         elif isinstance(exp, ast.Pointer):
             p1 = self.tvg.newvardecl()
+            self.tempdecl_list.append(VarDecl(p1))
             intermed_var = self.intermed_code_exp(p1, exp.expression)
             let_var = LetStatement(x, p1)
             itmd_explist.append(intermed_var)
@@ -298,16 +304,14 @@ class IntermedCodeGenerator(object):
         elif isinstance(exp, ast.BinaryOperators):
             p1 = self.tvg.newvardecl()
             p2 = self.tvg.newvardecl()
+            self.tempdecl_list.append(VarDecl(p1))
+            self.tempdecl_list.append(VarDecl(p2))
 
-            print("op = {0}".format(exp.op))
             if exp.op == "PLUS" or \
                exp.op == "MINUS" or \
                exp.op == "TIMES" or \
                exp.op == "DIVIDE":
 
-                print("left:")
-                print(exp.left)
-                print(exp.left.__dict__)
                 itmd_left = self.intermed_code_exp(p1, exp.left)
                 itmd_right = self.intermed_code_exp(p2, exp.right)
                 itmd_aop = ArithmeticOperation(exp.op, p1, p2)
@@ -338,6 +342,7 @@ class IntermedCodeGenerator(object):
 
         elif isinstance(exp, ast.Address):
             p1 = self.tvg.newvardecl()
+            self.tempdecl_list.append(VarDecl(p1))
             intermed_varp = self.intermed_code_exp(p1, exp.expression)
             let_xp = LetStatement(x, p1)
             itmd_explist.append(intermed_varp)
@@ -347,6 +352,7 @@ class IntermedCodeGenerator(object):
             # print関数の呼び出し
             if exp.identifier.name == "print":
                 p1 = self.tvg.newvardecl()
+                self.tempdecl_list.append(VarDecl(p1))
                 let_arg = self.intermed_code_exp(p1, exp.argument_expression.nodes[0])  # 引数は1つと仮定してもいい？
                 intermed_print = PrintStatement(p1)
                 itmd_explist.append(let_arg)
@@ -355,6 +361,8 @@ class IntermedCodeGenerator(object):
             else:
                 tempvars = [self.tvg.newvardecl()
                             for _ in exp.argument_expression.nodes]
+                for tempvar in tempvars:
+                    self.tempdecl_list.append(VarDecl(tempvar))
                 let_args = [self.intermed_code_exp(tempvars[i], arg) for i, arg in enumerate(
                     exp.argument_expression.nodes)]
                 intermed_funccall = CallStatement(
@@ -373,60 +381,9 @@ class IntermedCodeGenerator(object):
         if isinstance(statement, ast.NullNode):
             itmd_stmtlist.append(EmptyStatement())
 
-        elif isinstance(statement, ast.BinaryOperators) and \
-                statement.op == "ASSIGN":
-            # # x = y
-            # if isinstance(statement.left, ast.Identifier):
-            #     # x = f(*args)
-            #     if isinstance(statement.right, ast.FunctionExpression):
-            #         tempvars = [self.tvg.newvardecl()
-            #                     for _ in statement.right.argument_expression]
-            #         let_args = [self.intermed_code_exp(tempvars[i], arg) for i, arg in enumerate(
-            #             statement.right.argument_expression)]
-            #         if isinstance(statement.left, ast.Identifier):
-            #             intermed_funccall = CallStatement(
-            #                 statement.left.identifier, statement.right.identifier, tempvars)
-            #         elif isinstance(statement.left, ast.Pointer):
-            #             intermed_funccall = CallStatement(
-            #                 statement.left.expression.identifier, statement.right.identifier, tempvars)
-            #         for let_arg in reversed(let_args):
-            #             itmd_stmtlist.append(let_arg)
-            #         itmd_stmtlist.append(intermed_funccall)
-
-            # x = *y
-            if isinstance(statement.right, ast.Pointer):
-                p1 = self.tvg.newvardecl()
-                p2 = self.tvg.newvardecl()
-                let_left = self.intermed_code_exp(p1, statement.left)
-                let_right = self.intermed_code_exp(
-                    p2, statement.right.expression)
-                itmd_stmtlist.append(let_left)
-                itmd_stmtlist.append(let_right)
-                itmd_stmtlist.append(ReadStatement(p1, p2))
-
-            # *x = y
-            elif isinstance(statement.left, ast.Pointer):
-                p1 = self.tvg.newvardecl()
-                p2 = self.tvg.newvardecl()
-                let_left = self.intermed_code_exp(
-                    p1, statement.left.expression)
-                let_right = self.intermed_code_exp(p2, statement.right)
-                itmd_stmtlist.append(let_left)
-                itmd_stmtlist.append(let_right)
-                itmd_stmtlist.append(WriteStatement(p1, p2))
-
-            else:
-                p1 = self.tvg.newvardecl()
-                p2 = self.tvg.newvardecl()
-                let_left = self.intermed_code_exp(p1, statement.left)
-                let_right = self.intermed_code_exp(p2, statement.right)
-                let_stmt = LetStatement(p1, p2)
-                itmd_stmtlist.append(let_left)
-                itmd_stmtlist.append(let_right)
-                itmd_stmtlist.append(let_stmt)
-
         elif isinstance(statement, ast.IfStatement):
             p1 = self.tvg.newvardecl()
+            self.tempdecl_list.append(VarDecl(p1))
             let_exp = self.intermed_code_exp(p1, statement.expression)
             then_stmt = self.intermed_code_statement(statement.then_statement)
             else_stmt = self.intermed_code_statement(statement.else_statement)
@@ -437,6 +394,7 @@ class IntermedCodeGenerator(object):
 
         elif isinstance(statement, ast.WhileLoop):
             p1 = self.tvg.newvardecl()
+            self.tempdecl_list.append(VarDecl(p1))
             let_exp = self.intermed_code_exp(p1, statement.expression)
             stmt = self.intermed_code_statement(statement.statement)
             intermed_while = WhileStatement(p1, stmt[0])
@@ -444,10 +402,78 @@ class IntermedCodeGenerator(object):
             itmd_stmtlist.append(intermed_while)
 
         elif isinstance(statement, ast.ExpressionStatement):
-            p1 = self.tvg.newvardecl()
-            intermed_exp = self.intermed_code_exp(p1, statement.expression)
-            itmd_stmtlist.append(
-                intermed_exp)
+            if isinstance(statement.expression, ast.BinaryOperators) and \
+                statement.expression.op == "ASSIGN":
+
+                # *x = y
+                if isinstance(statement.expression.left, ast.Pointer):
+                    p1 = self.tvg.newvardecl()
+                    self.tempdecl_list.append(VarDecl(p1))
+
+                    let_left = self.intermed_code_exp(
+                        p1, statement.expression.left.expression)
+                    itmd_stmtlist.append(let_left)
+
+                    # 定数代入の場合右辺をintermed_code_expで評価する必要がない
+                    if isinstance(statement.expression.right, ast.Number):
+                        intexp = IntExpression(statement.expression.right.value)
+                        itmd_stmtlist.append(WriteStatement(p1, intexp))
+                    else:
+                        p2 = self.tvg.newvardecl()
+                        self.tempdecl_list.append(VarDecl(p2))
+
+                        let_right = self.intermed_code_exp(p2, statement.expression.right)
+                        itmd_stmtlist.append(let_right)
+                        itmd_stmtlist.append(WriteStatement(p1, p2))
+
+                # x = *y
+                elif isinstance(statement.expression.right, ast.Pointer):
+                    p1 = self.tvg.newvardecl()
+                    p2 = self.tvg.newvardecl()
+                    self.tempdecl_list.append(VarDecl(p1))
+                    self.tempdecl_list.append(VarDecl(p2))
+
+                    let_left = self.intermed_code_exp(p1, statement.expression.left)
+                    let_right = self.intermed_code_exp(
+                        p2, statement.expression.right.expression)
+                    itmd_stmtlist.append(let_left)
+                    itmd_stmtlist.append(let_right)
+                    itmd_stmtlist.append(ReadStatement(p1, p2))
+
+                # x(ただの変数) = y
+                elif isinstance(statement.expression.left, ast.Identifier):
+                    p1 = self.tvg.newvardecl()
+                    self.tempdecl_list.append(VarDecl(p1))
+
+                    # 右辺が定数のとき、else節の方法で右辺を処理すると無駄なストア・ロードが生じる
+                    if isinstance(statement.expression.right, ast.Number):
+                        intexp = IntExpression(statement.expression.right.value)
+                        let_stmt = LetStatement(statement.expression.left.identifier, intexp)
+                    else:
+                        let_right = self.intermed_code_exp(p1, statement.expression.right)
+                        let_stmt = LetStatement(statement.expression.left.identifier, p1)
+                        itmd_stmtlist.append(let_right)
+                    itmd_stmtlist.append(let_stmt)
+
+                # 存在するのか？
+                else:
+                    p1 = self.tvg.newvardecl()
+                    p2 = self.tvg.newvardecl()
+                    self.tempdecl_list.append(VarDecl(p1))
+                    self.tempdecl_list.append(VarDecl(p2))
+                    let_left = self.intermed_code_exp(p1, statement.expression.left)
+                    let_right = self.intermed_code_exp(p2, statement.expression.right)
+                    let_stmt = LetStatement(p1, p2)
+                    itmd_stmtlist.append(let_left)
+                    itmd_stmtlist.append(let_right)
+                    itmd_stmtlist.append(let_stmt)
+
+            else:
+                p1 = self.tvg.newvardecl()
+                self.tempdecl_list.append(VarDecl(p1))
+                intermed_exp = self.intermed_code_exp(p1, statement.expression)
+                itmd_stmtlist.append(
+                    intermed_exp)
 
         elif isinstance(statement, ast.ReturnStatement):
             if isinstance(statement.return_statement, ast.NullNode):
@@ -455,6 +481,7 @@ class IntermedCodeGenerator(object):
                 pass
             else:
                 p1 = self.tvg.newvardecl()
+                self.tempdecl_list.append(VarDecl(p1))
                 let_return = self.intermed_code_exp(
                     p1, statement.return_statement)
                 intermed_return = ReturnStatement(p1)
@@ -481,15 +508,15 @@ class IntermedCodeGenerator(object):
         for statement in compstmt.statement_list.nodes:
             stmt_list.append(self.intermed_code_statement(statement))
 
-        for stmtelem in flatten(stmt_list):
-            if isinstance(stmtelem, LetStatement):
-                if isinstance(stmtelem.var, sa.Decl) \
-                        and stmtelem.var.kind == "temp":
-                    decl_list.append(
-                        VarDecl(stmtelem.var))
+        # for stmtelem in flatten(stmt_list):
+        #     if isinstance(stmtelem, LetStatement):
+        #         if isinstance(stmtelem.var, sa.Decl) \
+        #                 and stmtelem.var.kind == "temp":
+        #             decl_list.append(
+        #                 VarDecl(stmtelem.var))
 
-            elif isinstance(stmtelem, CompoundStatement):
-                self.intermed_code_compstmt(stmtelem)
+            # elif isinstance(stmtelem, CompoundStatement):
+            #     self.intermed_code_compstmt(stmtelem)
 
         itmd_compstmt = CompoundStatement(
             flatten(decl_list), flatten(stmt_list))
@@ -502,13 +529,27 @@ class IntermedCodeGenerator(object):
            返り値として変換結果の中間命令列のリストを返す"""
         itmd_paramlist = []
         funcvar = fundef.function_declarator.identifier.identifier
+        compstmt = fundef.compound_statement
 
         if not isinstance(fundef.function_declarator.parameter_type_list, ast.NullNode):
             for param in fundef.function_declarator.parameter_type_list.nodes:
                 itmd_paramlist.append(
                     VarDecl(param.parameter_declarator.identifier.identifier))
 
-        itmd_compstmt = self.intermed_code_compstmt(fundef.compound_statement)
+        decl_list = []
+        stmt_list = []
+        for decl in compstmt.declaration_list.nodes:
+            decls = self.intermed_code_vardecl(decl)
+            for intermed_decl in decls:
+                decl_list.append(intermed_decl)
+
+        for statement in compstmt.statement_list.nodes:
+            stmt_list.append(self.intermed_code_statement(statement))
+
+        # TODO: decl_listとtempdecl_listを合わせてdecl_listとする
+        decl_list.extend(self.tempdecl_list)
+
+        itmd_compstmt = CompoundStatement(flatten(decl_list), flatten(stmt_list))
         itmd_fundef = FunctionDefinition(
             funcvar, itmd_paramlist, itmd_compstmt)
 
