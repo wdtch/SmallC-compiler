@@ -28,7 +28,7 @@ class Environment(Decl):
             self.decl_list = []
         else:
             self.decl_list = [decl]
-        # self.scope = []
+        self.deleted = []
 
     def add(self, decl):
         self.decl_list.append(decl)
@@ -157,29 +157,44 @@ class Analyzer(object):
             for declarator in nodelist.declarator_list.nodes:
                 decl_decl = self.analyze_declaration(
                         nodelist, declarator, level)
+
                 if isinstance(declarator.direct_declarator.identifier.identifier, Decl):
                     declname = declarator.direct_declarator.identifier.identifier.name
+                    # break
                 elif isinstance(declarator.direct_declarator.identifier.identifier, str):
                     declname = declarator.direct_declarator.identifier.identifier
+
                 if self.env.lookup(declname, scope_index) is None:
                     self.env.add(decl_decl)
                     declarator.direct_declarator.identifier.identifier = decl_decl
                 else:
                     existing_decl = self.env.lookup(
                         declname, scope_index)
+
+                    # if existing_decl.level > level:
+                        # scope_i = self.env.index(existing_decl)
+                        # self.analyze(nodelist, level, scope_i+1)
+
+                    declarator.direct_declarator.identifier.identifier = decl_decl
+
                     if existing_decl.kind == "fun" or existing_decl.kind == "proto":
-                        if existing_decl.level == 0:
+                        if level == 0:
                             logging.error("Line {0}: {1} is defined as a function.".format(
                                 declarator.direct_declarator.identifier.lineno, decl_decl.name))
                             self.error_count += 1
                         else:
                             self.env.add(decl_decl)
-                            declarator.direct_declarator.identifier.identifier = decl_decl
+                            # declarator.direct_declarator.identifier.identifier = decl_decl
+
                     elif existing_decl.kind == "var":
-                        if existing_decl.level == decl_decl.level:
+                        if existing_decl.level == level:
                             logging.error("Line {0}: Duplicate declaration of variable - \"{1}\"".format(
                                 declarator.direct_declarator.identifier.lineno, decl_decl.name))
                             self.error_count += 1
+                        else:
+                            self.env.add(decl_decl)
+                            # declarator.direct_declarator.identifier.identifier = decl_decl
+
                     elif existing_decl.kind == "param":
                         self.env.add(decl_decl)
                         logging.warning("Line {0}: Variable declaration \"{1}\" will hide parameter \"{2}\".".format(
@@ -250,6 +265,7 @@ class Analyzer(object):
                     logging.error("Line {0}: Function definition \"{1}\" is duplicated with existing function \"{2}\".".format(
                         nodelist.function_declarator.identifier.lineno, nodelist.function_declarator.identifier.identifier, existing_decl.name))
                     self.error_count += 1
+
                 elif existing_decl.kind == "proto":
                     if existing_decl.objtype != decl_funcdef.objtype:
                         logging.error("Line {0}: Type of function prototype \"{1}\" is \"{2}\" , but type of function definition \"{3}\" is \"{4}\"".format(
@@ -258,6 +274,7 @@ class Analyzer(object):
                     else:
                         self.env.add(decl_funcdef)
                         nodelist.function_declarator.identifier.identifier = decl_funcdef
+
                 elif existing_decl.kind == "var":
                     if existing_decl.level == 0:
                         logging.error("Line {0}: Function definition \"{1}\" is duplicated with global variable \"{2}\".".format(
@@ -271,7 +288,9 @@ class Analyzer(object):
                 func_index = self.env.decl_list.index(decl_funcdef)
                 self.analyze(
                     nodelist.function_declarator.parameter_type_list, level+1, func_index)
-                self.analyze(nodelist.compound_statement, level+2, func_index)
+                # self.analyze(nodelist.compound_statement, level+1, func_index)
+                self.analyze(nodelist.compound_statement.declaration_list, level+2, func_index)
+                self.analyze(nodelist.compound_statement.statement_list, level+2, func_index)
             except ValueError:
                 sys.exit("Failed to get index of function {0} in environment.\n".format(
                     decl_funcdef.name))
@@ -301,11 +320,17 @@ class Analyzer(object):
             #     self.analyze(paramdec.parameter_declarator.identifier, level)
 
         elif isinstance(nodelist, ast.CompoundStatement):
+            comp_level = level + 1
             for declaration in nodelist.declaration_list.nodes:
-                self.analyze(declaration, level, scope_index)
+                self.analyze(declaration, level+1, scope_index)
 
             for statement in nodelist.statement_list.nodes:
-                self.analyze(statement, level, scope_index)
+                self.analyze(statement, level+1, scope_index)
+
+            # 後始末
+            for i, envelem in enumerate(self.env.decl_list):
+                if envelem.level == comp_level:
+                    self.env.deleted.append(self.env.decl_list.pop(i))
 
         elif isinstance(nodelist, ast.DeclarationList):
             for declaration in nodelist.nodes:
@@ -429,7 +454,7 @@ class Analyzer(object):
         elif isinstance(nodelist, ast.ReturnStatement):
             self.analyze(nodelist.return_statement, level, scope_index)
 
-        return self.env
+        return self.env, self.env.deleted
 
 
 class TypeChecker(object):
@@ -595,6 +620,7 @@ class TypeChecker(object):
                 return "int"
             else:
                 logging.error("Line {0}: Invalid operand of *( ), not a pointer type.".format(nodelist.lineno))
+                self.error_count += 1
 
         elif isinstance(nodelist, ast.FunctionExpression):
             if isinstance(nodelist.identifier.identifier, str):
@@ -687,8 +713,8 @@ class ErrorManager(object):
         print("{0} Errors and {1} Warnings.".format(
             self.error_count, self.warning_count))
 
-        # if not self.warning_msg == "":
-        #     sys.stderr.write(self.warning_msg)
+        # if not logging.warning == "":
+        #     sys.stderr.write(logging.warning)
 
         # if not self.error_msg == "":
-        #     sys.exit(self.error_msg)
+        #     sys.exit(logging.error)
