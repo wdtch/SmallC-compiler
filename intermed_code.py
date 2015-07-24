@@ -43,6 +43,8 @@ class FunctionDefinition(object):
         self.var = var
         self.params = params
         self.body = body
+        self.localvarsize = 0
+        self.paramsize = 0
 
     def __eq__(self, other):
         # return self.var == other.var and self.params == other.params and
@@ -312,6 +314,10 @@ class IntermedCodeGenerator(object):
                exp.op == "TIMES" or \
                exp.op == "DIVIDE":
 
+                print("Dealing with Arithmetic Operation...")
+                print("op: {0}".format(exp.op))
+                print("left: {0}, {1}".format(exp.left, exp.left.__dict__))
+                print("right: {0}, {1}".format(exp.right, exp.right.__dict__))
                 itmd_left = self.intermed_code_exp(p1, exp.left)
                 itmd_right = self.intermed_code_exp(p2, exp.right)
                 itmd_aop = ArithmeticOperation(exp.op, p1, p2)
@@ -344,19 +350,24 @@ class IntermedCodeGenerator(object):
             p1 = self.tvg.newvardecl()
             self.tempdecl_list.append(VarDecl(p1))
             intermed_varp = self.intermed_code_exp(p1, exp.expression)
-            let_xp = LetStatement(x, p1)
+            addr_xp = AddressExpression(p1)
             itmd_explist.append(intermed_varp)
-            itmd_explist.append(let_xp)
+            itmd_explist.append(addr_xp)
 
         elif isinstance(exp, ast.FunctionExpression):
             # print関数の呼び出し
-            if exp.identifier.name == "print":
+            print("function expression -> intermed code")
+            print(exp.identifier.identifier)
+            if isinstance(exp.identifier.identifier, sa.Decl):
+                print(exp.identifier.identifier.__dict__)
+            if exp.identifier.identifier.name == "print":
                 p1 = self.tvg.newvardecl()
                 self.tempdecl_list.append(VarDecl(p1))
                 let_arg = self.intermed_code_exp(p1, exp.argument_expression.nodes[0])  # 引数は1つと仮定してもいい？
                 intermed_print = PrintStatement(p1)
                 itmd_explist.append(let_arg)
                 itmd_explist.append(intermed_print)
+
             # それ以外の関数呼び出し
             else:
                 tempvars = [self.tvg.newvardecl()
@@ -366,7 +377,7 @@ class IntermedCodeGenerator(object):
                 let_args = [self.intermed_code_exp(tempvars[i], arg) for i, arg in enumerate(
                     exp.argument_expression.nodes)]
                 intermed_funccall = CallStatement(
-                    x, exp.identifier, tempvars)
+                    x, exp.identifier.identifier, tempvars)
                 for let_arg in reversed(let_args):
                     itmd_explist.append(let_arg)
                 itmd_explist.append(intermed_funccall)
@@ -382,13 +393,18 @@ class IntermedCodeGenerator(object):
             itmd_stmtlist.append(EmptyStatement())
 
         elif isinstance(statement, ast.IfStatement):
+            print("converting if statement ast to intermed code...")
+            print("then: {0}".format(statement.then_statement))
+            print("else: {0}".format(statement.else_statement))
             p1 = self.tvg.newvardecl()
             self.tempdecl_list.append(VarDecl(p1))
             let_exp = self.intermed_code_exp(p1, statement.expression)
             then_stmt = self.intermed_code_statement(statement.then_statement)
             else_stmt = self.intermed_code_statement(statement.else_statement)
+            print(then_stmt)
+            print(else_stmt)
             intermed_if = IfStatement(
-                p1, then_stmt[0], else_stmt[0])  # リストになってるので[0]をつける
+                p1, then_stmt, else_stmt)  # リストになってるので[0]をつける…！？
             itmd_stmtlist.append(let_exp)
             itmd_stmtlist.append(intermed_if)
 
@@ -397,13 +413,15 @@ class IntermedCodeGenerator(object):
             self.tempdecl_list.append(VarDecl(p1))
             let_exp = self.intermed_code_exp(p1, statement.expression)
             stmt = self.intermed_code_statement(statement.statement)
-            intermed_while = WhileStatement(p1, stmt[0])
+            whilestmt = flatten([stmt, let_exp])
+            intermed_while = WhileStatement(p1, whilestmt)
             itmd_stmtlist.append(let_exp)
             itmd_stmtlist.append(intermed_while)
 
         elif isinstance(statement, ast.ExpressionStatement):
             if isinstance(statement.expression, ast.BinaryOperators) and \
                 statement.expression.op == "ASSIGN":
+                print("intermed_code: ASSIGN statement.")
 
                 # *x = y
                 if isinstance(statement.expression.left, ast.Pointer):
@@ -442,18 +460,30 @@ class IntermedCodeGenerator(object):
 
                 # x(ただの変数) = y
                 elif isinstance(statement.expression.left, ast.Identifier):
+                    print("left is tadano hensuu")
+                    print("op: {0}".format(statement.expression.op))
+                    print("left: {0}".format(statement.expression.left.identifier.__dict__))
+                    print("right: {0}".format(statement.expression.right.__dict__))
                     p1 = self.tvg.newvardecl()
                     self.tempdecl_list.append(VarDecl(p1))
 
                     # 右辺が定数のとき、else節の方法で右辺を処理すると無駄なストア・ロードが生じる
                     if isinstance(statement.expression.right, ast.Number):
                         intexp = IntExpression(statement.expression.right.value)
+                        # let_stmt = self.intermed_code_exp(statement.expression.left, intexp)
                         let_stmt = LetStatement(statement.expression.left.identifier, intexp)
+                        print("Let statement to add: {0}".format(let_stmt))
+                        itmd_stmtlist.append(let_stmt)
                     else:
                         let_right = self.intermed_code_exp(p1, statement.expression.right)
-                        let_stmt = LetStatement(statement.expression.left.identifier, p1)
+                        let_stmt = LetStatement(statement.expression.left.identifier, VarExpression(p1))
+                        # let_stmt = self.intermed_code_exp(statement.expression.left, p1)
                         itmd_stmtlist.append(let_right)
-                    itmd_stmtlist.append(let_stmt)
+                        print("Let statement to add: {0}".format(let_stmt))
+                        itmd_stmtlist.append(let_stmt)
+                        # itmd_stmtlist.append(let_stmt)
+                    # print("Let statement to add: {0}".format(let_stmt))
+                    # itmd_stmtlist.append(let_stmt)
 
                 # 存在するのか？
                 else:
