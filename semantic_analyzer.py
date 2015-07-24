@@ -150,6 +150,9 @@ class Analyzer(object):
         """抽象構文木のノードを受け取り、主に名前解析を行う(式の形の検査も含む)"""
         if isinstance(nodelist, ast.ExternalDeclarationList):
             for node in nodelist.nodes:
+                print("Analyzing external declaration list...")
+                print(node)
+                print(node.__dict__)
                 self.analyze(node, level)
 
         # 変数宣言の解析
@@ -287,10 +290,10 @@ class Analyzer(object):
             try:
                 func_index = self.env.decl_list.index(decl_funcdef)
                 self.analyze(
-                    nodelist.function_declarator.parameter_type_list, level+1, func_index)
-                # self.analyze(nodelist.compound_statement, level+1, func_index)
-                self.analyze(nodelist.compound_statement.declaration_list, level+2, func_index)
-                self.analyze(nodelist.compound_statement.statement_list, level+2, func_index)
+                    nodelist.function_declarator.parameter_type_list, level+1)
+                # self.analyze(nodelist.compound_statement, level+1)
+                self.analyze(nodelist.compound_statement.declaration_list, level+2)
+                self.analyze(nodelist.compound_statement.statement_list, level+2)
             except ValueError:
                 sys.exit("Failed to get index of function {0} in environment.\n".format(
                     decl_funcdef.name))
@@ -344,9 +347,9 @@ class Analyzer(object):
             self.analyze(nodelist.expression, level, scope_index)
 
         elif isinstance(nodelist, ast.FunctionExpression):
-            print("analyzing function expression nowwwwwwwwwww")
-            print(nodelist.__dict__)
-            print(nodelist.identifier.__dict__)
+            # print("analyzing function expression nowwwwwwwwwww")
+            # print(nodelist.__dict__)
+            # print(nodelist.identifier.__dict__)
             # 関数名解析
             if self.env.lookup(nodelist.identifier.identifier) is None:
                 logging.error("Line {0}: Referencing undeclared function \"{1}\".".format(
@@ -583,12 +586,12 @@ class TypeChecker(object):
                 if self.check_type(nodelist.left) == self.check_type(nodelist.right) == "int":
                     return "int"
                 elif self.check_type(nodelist.left) == "int" and self.check_type(nodelist.right) == ("pointer", "int"):
-                    nodelist.left = ast.BinaryOperators(
-                        "TIMES", nodelist.left, ast.Number(4))
+                    # nodelist.left = ast.BinaryOperators(
+                        # "TIMES", nodelist.left, ast.Number(4))
                     return ("pointer", "int")
                 elif self.check_type(nodelist.left) == ("pointer", "int") and self.check_type(nodelist.right) == "int":
-                    nodelist.right = ast.BinaryOperators(
-                        "TIMES", nodelist.right, ast.Number(4), nodelist.left.lineno)
+                    # nodelist.right = ast.BinaryOperators(
+                        # "TIMES", nodelist.right, ast.Number(4), nodelist.left.lineno)
                     return ("pointer", "int")
                 else:
                     logging.error(
