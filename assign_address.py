@@ -21,7 +21,7 @@ class AssignAddress(object):
             if isinstance(itmdelem, ic.VarDecl):
                 if isinstance(itmdelem.var.objtype, tuple) and \
                     itmdelem.var.objtype[0] == "array":
-                    self.intermed_code[i].var.offset = self.ofs_to_globalarray()
+                    self.intermed_code[i].var.offset = self.ofs_to_globalarray(itmdelem.var.objtype[2])
                 else:
                     self.intermed_code[i].var.offset = self.ofs_to_globalvar()
 
@@ -32,26 +32,31 @@ class AssignAddress(object):
                 for j, param in enumerate(itmdelem.params):
                     if isinstance(param.var.objtype, tuple) and \
                         param.var.objtype[0] == "array":
-                        self.intermed_code[i].params[j].var.offset = self.ofs_to_arrayparam()
+                        self.intermed_code[i].params[j].var.offset = self.ofs_to_arrayparam(param.var.objtype[2])
                     else:
                         self.intermed_code[i].params[j].var.offset = self.ofs_to_param()
 
                 # self.ofsman.reset()
 
                 # 関数内での宣言
-                # for k, decl in enumerate(itmdelem.body.decls):
-                #     if isinstance(decl.var.objtype, tuple) and \
-                #         decl.var.objtype[0] == "array":
-                #         self.intermed_code[i].body.decls[k].var.offset = self.ofs_to_arrayvar()
-                #     else:
-                #         self.intermed_code[i].body.decls[k].var.offset = self.ofs_to_var()
+                for k, decl in enumerate(itmdelem.body.decls):
+                    if isinstance(decl.var.objtype, tuple) and \
+                        decl.var.objtype[0] == "array":
+                        self.intermed_code[i].body.decls[k].var.offset = self.ofs_to_arrayvar(decl.var.objtype[2])
+                    else:
+                        print("assining address to declaration in function...")
+                        self.intermed_code[i].body.decls[k].var.offset = self.ofs_to_var()
+                        print(self.intermed_code[i].body.decls[k].var.__dict__)
 
                 # self.ofsman.reset()
 
                 # 関数内の複文に含まれる宣言
                 # for stmt in itmdelem.body.stmts:
-                    # self.assign_address_to_stmt(stmt)
+                #     self.assign_address_to_stmt(stmt)
                 self.assign_address_to_compstmt(itmdelem.body)
+
+                itmdelem.localvarsize = -1 * (self.ofsman.current_varoffset - 4)
+                itmdelem.paramsize = self.ofsman.current_paramoffset
 
                 # self.ofsman.reset()
 
@@ -59,6 +64,7 @@ class AssignAddress(object):
 
     def assign_address_to_compstmt(self, compstmt):
         """引数として取った複文の宣言と、文に含まれる一時変数の宣言にアドレスを割り当てる"""
+        print("assining address to compound statement...")
         # 宣言
         for decl in compstmt.decls:
             if isinstance(decl.var.objtype, tuple) and \
@@ -66,8 +72,10 @@ class AssignAddress(object):
                 if decl.var.offset == -1:
                     decl.var.offset = self.ofs_to_arrayvar(decl.var.objtype[2])
             else:
+                print("found declaration.")
                 if decl.var.offset == -1:
                     decl.var.offset = self.ofs_to_var()
+                    print(decl.var.__dict__)
 
         # self.ofsman.reset()
 
@@ -81,22 +89,25 @@ class AssignAddress(object):
                     self.assign_address_to_compstmt(stmt.then_stmt)
                 else:
                     # とりあえずprintだけ
-                    print(stmt.then_stmt)
-                    print(stmt.then_stmt.__dict__)
+                    # print(stmt.then_stmt)
+                    # print(stmt.then_stmt.__dict__)
+                    pass
 
                 if isinstance(stmt.else_stmt, ic.CompoundStatement):
                     self.assign_address_to_compstmt(stmt.else_stmt)
                 else:
                     # とりあえずprintだけ
-                    print(stmt.else_stmt)
-                    print(stmt.else_stmt.__dict__)
+                    # print(stmt.else_stmt)
+                    # print(stmt.else_stmt.__dict__)
+                    pass
 
             elif isinstance(stmt, ic.WhileStatement):
                 if isinstance(stmt, ic.CompoundStatement):
                     self.assign_address_to_compstmt(stmt.stmt)
                 else:
-                    print(stmt.stmt)
-                    print(stmt.stmt.__dict__)
+                    # print(stmt.stmt)
+                    # print(stmt.stmt.__dict__)
+                    pass
 
             elif isinstance(stmt, ic.LetStatement):
                 if stmt.var.kind == "temp" and stmt.var.offset == -1:
