@@ -5,6 +5,7 @@
 
 import ply.lex as lex
 import ply.yacc as yacc
+import sys
 import tokenrules
 from lexer import Lexer
 import ast
@@ -453,11 +454,11 @@ class Parser(object):
 
     def p_error(self, p):
         if p:
-            print("Syntax error at token", p.type)
+            sys.exit("Syntax error at token", p.type)
             # Just discard the token and tell the parser it's okay.
             self.parser.errok()
         else:
-            print("Syntax error at EOF")
+            sys.exit("Syntax error at EOF")
 
     # 解析実行部
     def build(self, debug=False, **kwargs):
