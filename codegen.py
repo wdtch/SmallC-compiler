@@ -1,9 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import semantic_analyzer
+import semantic_analyzer as sa
 import intermed_code as ic
 import collections
+
 
 def flatten(l):
     i = 0
@@ -110,8 +111,14 @@ class CodeGenerator(object):
     def varofs_to_fp(self, vardecl):
         """局所変数またはパラメータから作られたDecl型のオブジェクトを受け取って、そこから読み取った
            オフセットの値を元に$fp経由でアクセスするためのアドレス式を返す"""
-        offset = vardecl.offset
-        return str(offset) + "($fp)"
+        if isinstance(vardecl, ic.IntExpression):
+            return vardecl.num
+        elif vardecl.level == 0:
+            offset = vardecl.offset
+            return str(offset) + "($gp)"
+        else:
+            offset = vardecl.offset
+            return str(offset) + "($fp)"
 
     def argofs_to_sp(self, paramdecl):
         """引数を表すDecl型のオブジェクトを受け取って、そこから読み取った
@@ -133,9 +140,13 @@ class CodeGenerator(object):
         elif isinstance(exp, ic.VarExpression):
             arg = exp.var
             argaddr = self.varofs_to_fp(arg)
-            destaddr = self.varofs_to_fp(dest.var)
-            instr_list = [Instruction("lw", (self.reg0, argaddr)),
-                          Instruction("sw", (self.reg0, destaddr))]
+            destaddr = self.varofs_to_fp(dest)
+            if isinstance(exp.var.objtype, tuple) and exp.var.objtype[0] == "array":
+                instr_list = [Instruction("la", (self.reg0, argaddr)),
+                              Instruction("sw", (self.reg0, destaddr))]
+            else:
+                instr_list = [Instruction("lw", (self.reg0, argaddr)),
+                              Instruction("sw", (self.reg0, destaddr))]
 
         elif isinstance(exp, ic.ArithmeticOperation):
             if exp.op == "PLUS":
@@ -146,24 +157,15 @@ class CodeGenerator(object):
                 op = "mul"
             elif exp.op == "DIVIDE":
                 op = "div"
-            elif exp.op = "AND":
-                op = "and"
-            elif exp.op = "OR":
-                op = "or"
 
-            if exp.var_left.objtype == exp.var_right.objtype == "int":
-                addr_left = self.varofs_to_fp(exp.var_left)
-                addr_right = self.varofs_to_fp(exp.var_right)
-                destaddr = self.varofs_to_fp(dest.var)
+            addr_left = self.varofs_to_fp(exp.var_left)
+            addr_right = self.varofs_to_fp(exp.var_right)
+            destaddr = self.varofs_to_fp(dest)
 
-                instr_list = [Instruction("lw", (self.reg0, addr_left)),
-                              Instruction("lw", (self.reg1, addr_right)),
-                              Instruction(op, (self.reg0, self.reg0, self.reg1)),
-                              Instruction("sw", (self.reg0, destaddr))]
-
-            # 配列の要素に…アクセスするっ…！
-            elif exp.var_left == ("pointer", "int") or exp.var_right == ("pointer", "int"):
-                pass # 保留
+            instr_list = [Instruction("lw", (self.reg0, addr_left)),
+                          Instruction("lw", (self.reg1, addr_right)),
+                          Instruction(op, (self.reg0, self.reg0, self.reg1)),
+                          Instruction("sw", (self.reg0, destaddr))]
 
         elif isinstance(exp, ic.RelationalExpression):
             if exp.op == "LEQ":
@@ -178,14 +180,34 @@ class CodeGenerator(object):
                 op = "seq"
             elif exp.op == "NEQ":
                 op = "sne"
+            elif exp.op == "AND":
+                op = "and"
+            elif exp.op == "OR":
+                op = "or"
 
             addr_left = self.varofs_to_fp(exp.var_left)
             addr_right = self.varofs_to_fp(exp.var_right)
-            destaddr = self.varofs_to_fp(dest.var)
+            destaddr = self.varofs_to_fp(dest)
 
             instr_list = [Instruction("lw", (self.reg0, addr_left)),
                           Instruction("lw", (self.reg1, addr_right)),
                           Instruction(op, (self.reg0, self.reg0, self.reg1)),
+                          Instruction("sw", (self.reg0, destaddr))]
+
+        elif isinstance(exp, ic.AddressExpression):
+            arg = exp.var
+            argaddr = self.varofs_to_fp(arg)
+            destaddr = self.varofs_to_fp(dest)
+            instr_list = [Instruction("la", (self.reg0, argaddr)),
+                          Instruction("sw", (self.reg0, destaddr))]
+
+        elif isinstance(exp, ic.ReadExpression):
+            arg = exp.var
+            argaddr = self.varofs_to_fp(arg)
+            destaddr = self.varofs_to_fp(dest)
+            argderef = "0(" + self.reg0 + ")"
+            instr_list = [Instruction("lw", (self.reg0, argaddr)),
+                          Instruction("lw", (self.reg0, argderef)),
                           Instruction("sw", (self.reg0, destaddr))]
 
         return instr_list
@@ -200,11 +222,16 @@ class CodeGenerator(object):
 
         elif isinstance(stmt, ic.WriteStatement):
             destaddr = self.varofs_to_fp(stmt.dest)
-            srcaddr = self.varofs_to_fp(stmt.src)
             destderef = "0(" + str(self.reg1) + ")"
-            instr_list = [Instruction("lw", (self.reg0, srcaddr)),
-                          Instruction("lw", (self.reg1, destaddr)),
-                          Instruction("sw", (self.reg0, destderef))]
+            if isinstance(stmt.src, ic.IntExpression):
+                instr_list = [Instruction("li", (self.reg0, stmt.src.num)),
+                              Instruction("lw", (self.reg1, destaddr)),
+                              Instruction("sw", (self.reg0, destderef))]
+            else:
+                srcaddr = self.varofs_to_fp(stmt.src)
+                instr_list = [Instruction("lw", (self.reg0, srcaddr)),
+                              Instruction("lw", (self.reg1, destaddr)),
+                              Instruction("sw", (self.reg0, destderef))]
 
         elif isinstance(stmt, ic.ReadStatement):
             destaddr = self.varofs_to_fp(stmt.dest)
@@ -217,52 +244,93 @@ class CodeGenerator(object):
         elif isinstance(stmt, ic.LetStatement):
             dest = stmt.var
             exp = stmt.exp
+            if isinstance(exp, ic.VarExpression) and isinstance(exp.var.objtype, tuple) and exp.var.objtype[0] == "array":
+                dest.objtype = "array"
             instr_list = self.intermed_exp_to_code(dest, exp)
 
         elif isinstance(stmt, ic.IfStatement):
-            expaddr = self.intermed_exp_to_code(stmt.var)
-            then_code = flatten([self.intermed_stmt_to_code(tstmt) for tstmt in stmt.then_stmt])
-            else_code = flatten([self.intermed_stmt_to_code(estmt) for estmt in stmt.else_stmt])
+            expaddr = self.varofs_to_fp(stmt.var)
+
+            if isinstance(stmt.then_stmt, ic.CompoundStatement):
+                then_code = flatten([self.intermed_stmt_to_code(
+                    localvarsize, paramsize, tstmt) for tstmt in stmt.then_stmt.stmts])
+            else:
+                then_code = flatten([self.intermed_stmt_to_code(
+                    localvarsize, paramsize, tstmt) for tstmt in stmt.then_stmt])
+
+            if isinstance(stmt.else_stmt, ic.CompoundStatement):
+                else_code = flatten([self.intermed_stmt_to_code(
+                    localvarsize, paramsize, estmt) for estmt in stmt.else_stmt.stmts])
+            else:
+                else_code = flatten([self.intermed_stmt_to_code(
+                    localvarsize, paramsize, estmt) for estmt in stmt.else_stmt])
 
             label1 = self.labelman.nextlabel()
             label2 = self.labelman.nextlabel()
 
             instr_list = flatten([Instruction("lw", (self.reg0, expaddr)),
-                                  Instruction("beqz", (self.reg0, label1)),
-                                  then_code,
-                                  Instruction("j", label2),
-                                  Label(label1),
-                                  else_code,
-                                  Label(label2)])
+                                  Instruction("beqz", (self.reg0, label1))])
+            for then_codeelem in then_code:
+                instr_list.append(then_codeelem)
+
+            instr_list.append(Instruction("j", label2))
+            instr_list.append(Label(label1))
+
+            for else_codeelem in else_code:
+                instr_list.append(else_codeelem)
+
+            instr_list.append(Label(label2))
+
+            flatten(instr_list)  # 一応
 
         elif isinstance(stmt, ic.WhileStatement):
             expaddr = self.varofs_to_fp(stmt.var)
-            code_true = flatten([self.intermed_stmt_to_code(tstmt) for tstmt in stmt.stmt])
+            if isinstance(stmt.stmt, ic.CompoundStatement):
+                code_true = flatten([self.intermed_stmt_to_code(
+                    localvarsize, paramsize, tstmt) for tstmt in stmt.stmt.stmts])
+            else:
+                code_true = flatten(
+                    [self.intermed_stmt_to_code(localvarsize, paramsize, tstmt) for tstmt in stmt.stmt])
             loop_label = self.labelman.nextlabel()
             break_label = self.labelman.nextlabel()
 
             instr_list = flatten([Instruction("lw", (self.reg0, expaddr)),
-                                  Instruction("beqz", (self.reg0, break_label)),
-                                  Label(loop_label),
-                                  code_true,
-                                  Instruction("lw", (self.reg0, expaddr)),
-                                  Instruction("beqz", (self.reg0, break_label)),
-                                  Label(break_label)])
+                                  Instruction(
+                                      "beqz", (self.reg0, break_label)),
+                                  Label(loop_label)])
+
+            for code_true_elem in code_true:
+                instr_list.append(code_true_elem)
+
+            instr_list.append(Instruction("lw", (self.reg0, expaddr)))
+            instr_list.append(Instruction("beqz", (self.reg0, break_label)))
+            instr_list.append(Instruction("j", loop_label))
+            instr_list.append(Label(break_label))
 
         elif isinstance(stmt, ic.ReturnStatement):
             retaddr = self.varofs_to_fp(stmt.var)
             instr_list = flatten([Instruction("lw", (self.reg0, retaddr)),
-                                  Instruction("move", (self.return_reg, self.reg0)),
+                                  Instruction(
+                                      "move", (self.return_reg, self.reg0)),
                                   self.restore_frame(localvarsize, paramsize)])
 
         elif isinstance(stmt, ic.CallStatement):
+            # if not stmt.dest == None:
             destaddr = self.varofs_to_fp(stmt.dest)
-            func = stmt.function
+            func = stmt.function.name
             args_control = []
 
             for i, argvar in enumerate(stmt.variables):
-                args_control.append(Instruction("lw", (self.reg0, self.varofs_to_fp(argvar))))
-                args_control.append(Instruction("sw", (self.reg0, str(-4 * (len(stmt.variables) - i)) + "($sp)")))
+                if isinstance(argvar, ic.AddressExpression):
+                    args_control.append(
+                        Instruction("la", (self.reg0, self.varofs_to_fp(argvar))))
+                    args_control.append(
+                        Instruction("sw", (self.reg0, str(-4 * (len(stmt.variables) - i)) + "($sp)")))
+                else:
+                    args_control.append(
+                        Instruction("lw", (self.reg0, self.varofs_to_fp(argvar))))
+                    args_control.append(
+                        Instruction("sw", (self.reg0, str(-4 * (len(stmt.variables) - i)) + "($sp)")))
 
             instr_list = flatten([args_control,
                                   Instruction("jal", func),
@@ -273,58 +341,48 @@ class CodeGenerator(object):
             instr_list = [Instruction("li", (self.return_reg, 1)),
                           Instruction("lw", (self.reg0, varaddr)),
                           Instruction("move", ("$a0", self.reg0)),
+                          Instruction("syscall", ()),
+                          Instruction("li", ("$v0", 4)),  # 改行を呼び出し
+                          Instruction("la", ("$a0", "nl")),
                           Instruction("syscall", ())]
 
-        return instr_list
+        elif isinstance(stmt, ic.CompoundStatement):
+            instr_list = flatten([self.intermed_stmt_to_code(
+                localvarsize, paramsize, stmtelem) for stmtelem in stmt.stmts])
 
-    def intermed_globalvar_to_code(self, vardecl):
-        """グローバル変数から作られたVardecl型のオブジェクトを受け取って、そこから
-           読み取ったオフセットの値を元に$gp経由でアクセスするためのアドレスを返す"""
-        pass
+        return instr_list
 
     def intermed_fundef_to_code(self, fundef):
         """関数定義の中間命令を受け取って、その中の宣言と複文、関数定義本体をアセンブリに
            変換した結果を返す"""
         funcvar = fundef.var
-        localvarsize = 4 * len(fundef.body.decls)
-        paramsize = 4 * len(fundef.params)
-        code = [self.intermed_stmt_to_code(localvarsize, paramsize, stmt) for stmt in fundef.body.stmts]
+        code = [self.intermed_stmt_to_code(
+            fundef.localvarsize, fundef.paramsize, stmt) for stmt in fundef.body.stmts]
 
         instr_list = flatten([Label(funcvar.name),
-                      self.allocate_frame(localvarsize, paramsize),
-                      code,
-                      self.restore_frame(localvarsize, paramsize)])
-
-        print("------ intermed fundef to code ------")
-        print(localvarsize)
-        print(paramsize)
-        print(code)
-        print(instr_list)
+                              self.allocate_frame(
+                                  fundef.localvarsize, fundef.paramsize),
+                              flatten(code),
+                              self.restore_frame(fundef.localvarsize, fundef.paramsize)])
 
         return instr_list
 
     def intermed_code_to_code(self):
         localvarsize = 0
-        fundef = []
+        code = []
 
-        print("------ intermed code to assembly ------")
         for itmd in self.intermed_code:
-            print(itmd)
             if isinstance(itmd, ic.VarDecl):
                 localvarsize += 4
             elif isinstance(itmd, ic.FunctionDefinition):
-                localvarsize += 4 * len(itmd.body.decls)
-                fundef.append(self.intermed_fundef_to_code(itmd))
-
-        print("fundef: {0}".format(fundef))
+                localvarsize += itmd.localvarsize
+                code.append(self.intermed_fundef_to_code(itmd))
 
         instr_list = flatten([Directive(".text", ()),
                               Directive(".globl", ("main")),
-                              # グローバル変数の変換,
-                              fundef])
+                              code])
 
         return instr_list
-
 
 
 class LabelManager(object):
