@@ -3,9 +3,6 @@
 
 '''lexとyaccで用いるトークンをまとめたモジュール'''
 
-from __future__ import unicode_literals
-
-
 #  reserved words list
 reserved = {
     'return': 'RETURN',
