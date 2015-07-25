@@ -3,7 +3,6 @@
 
 """抽象構文木を構築するためのモジュール"""
 
-from __future__ import unicode_literals
 import ply.lex as lex
 import ply.yacc as yacc
 
@@ -93,18 +92,20 @@ class TypeSpecifier(Node):
 
 class BinaryOperators(Node):
 
-    def __init__(self, op, left, right):
+    def __init__(self, op, left, right, lineno):
         self.op = op
         self.left = left
         self.right = right
+        self.lineno = lineno
 
 # Unary Operators
 
 
 class UnaryOperator(Node):
 
-    def __init__(self, node):
+    def __init__(self, node, lineno):
         self.expression = node
+        self.lineno = lineno
 
 # class Negative(UnaryOperator):
     # pass
@@ -117,44 +118,33 @@ class Address(UnaryOperator):
 class Pointer(UnaryOperator):
     pass
 
-# class Increment(UnaryOperator):
-#     pass
-
-# class Decrement(UnaryOperator):
-#     pass
-
-# statement
-
 
 class ExpressionStatement(Node):
 
     def __init__(self, expr):
         self.expression = expr
 
-# conditional statements
 
+# conditional statements
 
 class IfStatement(Node):
 
-    def __init__(self, expr, then_stmt, else_stmt):
+    def __init__(self, expr, then_stmt, else_stmt, lineno):
         self.expression = expr
         self.then_statement = then_stmt
         self.else_statement = else_stmt
+        self.lineno = lineno
 
 
 class WhileLoop(Node):
 
-    def __init__(self, expr, stmt):
+    def __init__(self, expr, stmt, lineno):
         self.expression = expr
         self.statement = stmt
+        self.lineno = lineno
 
 
 class ForLoop(Node):
-    # def __init__(self, initial, end, variation, stmt):
-    #     self.initial = initial
-    #     self.end = end
-    #     self.variation = variation
-    #     self.statement = stmt
 
     def __init__(self, stmt_firstexp, whilenode):
         self.firstexp_statement = stmt_firstexp
